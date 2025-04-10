@@ -818,14 +818,24 @@ if st.session_state.full_dataframe is not None and not st.session_state.full_dat
 if st.session_state.calculation_result:
     st.markdown("---")
     st.header("3. ผลการคำนวณ")
-    st.code("รายละเอียดค่าไฟฟ้าโดยประมาณ:", st.session_state.calculation_result, language=None, height=450, key="result_text_area")
 
-    # เพิ่มปุ่มสำหรับดาวน์โหลดผลลัพธ์เป็นไฟล์ txt
+    # (ทางเลือก) เพิ่ม Label ด้วย st.caption หรือ st.markdown ก่อนแสดงผลลัพธ์
+    st.caption("รายละเอียดค่าไฟฟ้าโดยประมาณ:") # ใช้ caption สำหรับ Label
+
+    # เรียกใช้ st.code() ให้ถูกต้อง: ใส่เฉพาะ body และ language
+    st.code(
+        st.session_state.calculation_result, # body: ข้อความผลลัพธ์
+        language=None # ไม่ต้องทำ syntax highlighting
+    )
+
+    # ส่วน download button เหมือนเดิม
     try:
+         # ใช้ encoding utf-8 เพื่อรองรับภาษาไทย
          result_bytes = st.session_state.calculation_result.encode('utf-8')
          st.download_button(
              label="📥 ดาวน์โหลดผลลัพธ์ (.txt)",
              data=result_bytes,
+             # สร้างชื่อไฟล์ที่มีวันที่และเวลาปัจจุบัน
              file_name=f"electricity_bill_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt",
              mime='text/plain'
          )
