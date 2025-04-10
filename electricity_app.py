@@ -818,7 +818,7 @@ if st.session_state.full_dataframe is not None and not st.session_state.full_dat
 if st.session_state.calculation_result:
     st.markdown("---")
     st.header("3. ผลการคำนวณ")
-    st.text_area("รายละเอียดค่าไฟฟ้าโดยประมาณ:", st.session_state.calculation_result, height=450, key="result_text_area")
+    st.text_area("รายละเอียดค่าไฟฟ้าโดยประมาณ:", st.session_state.calculation_result, height=450, key="result_text_area", disabled=True)
 
     # เพิ่มปุ่มสำหรับดาวน์โหลดผลลัพธ์เป็นไฟล์ txt
     try:
