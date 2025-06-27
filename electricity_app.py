@@ -26,17 +26,11 @@ TARIFFS = {
 # 2. อัตราค่า Ft (Fuel Adjustment Charge)
 FT_RATES = {
     # ข้อมูลปี 2023
-    (2023, 1): 0.9343,
-    (2023, 5): 0.9119,
-    (2023, 9): 0.2048,
+    (2023, 1): 0.9343, (2023, 5): 0.9119, (2023, 9): 0.2048,
     # ข้อมูลปี 2024
-    (2024, 1): 0.3972,
-    (2024, 5): 0.3972,
-    (2024, 9): 0.3972,
+    (2024, 1): 0.3972, (2024, 5): 0.3972, (2024, 9): 0.3972,
     # ข้อมูลปี 2025 (ค่าประมาณ)
-    (2025, 1): 0.3972,
-    (2025, 5): 0.4800,
-    (2025, 9): 0.4800,
+    (2025, 1): 0.3972, (2025, 5): 0.4800, (2025, 9): 0.4800,
 }
 
 # 3. วันหยุดสำหรับอัตรา TOU
@@ -51,29 +45,12 @@ def get_all_offpeak_days(year, official_holidays_str):
         cal = calendar.monthcalendar(year, month)
         for week in cal:
             saturday, sunday = week[calendar.SATURDAY], week[calendar.SUNDAY]
-            if saturday != 0:
-                offpeak_days.add(date(year, month, saturday))
-            if sunday != 0:
-                offpeak_days.add(date(year, month, sunday))
+            if saturday != 0: offpeak_days.add(date(year, month, saturday))
+            if sunday != 0: offpeak_days.add(date(year, month, sunday))
     return offpeak_days
 
-# วันหยุดปี 2024
-HOLIDAYS_TOU_2024_STR = [
-    "2024-01-01", "2024-02-24", "2024-02-26", "2024-04-06", "2024-04-08",
-    "2024-04-13", "2024-04-14", "2024-04-15", "2024-04-16", "2024-05-01",
-    "2024-05-04", "2024-05-06", "2024-05-22", "2024-06-03", "2024-07-20",
-    "2024-07-21", "2024-07-22", "2024-07-28", "2024-07-29", "2024-08-12",
-    "2024-10-13", "2024-10-14", "2024-10-23", "2024-12-05", "2024-12-10",
-    "2024-12-31"
-]
-
-# วันหยุดปี 2025
-HOLIDAYS_TOU_2025_STR = [
-    "2025-01-01", "2025-02-12", "2025-02-26", "2025-04-07", "2025-04-14",
-    "2025-04-15", "2025-05-01", "2025-05-05", "2025-06-03", "2025-07-10",
-    "2025-07-11", "2025-07-28", "2025-08-12", "2025-10-13", "2025-10-23",
-    "2025-12-05", "2025-12-08", "2025-12-10", "2025-12-29", "2025-12-31"
-]
+HOLIDAYS_TOU_2024_STR = ["2024-01-01", "2024-02-24", "2024-02-26", "2024-04-06", "2024-04-08", "2024-04-13", "2024-04-14", "2024-04-15", "2024-04-16", "2024-05-01", "2024-05-04", "2024-05-06", "2024-05-22", "2024-06-03", "2024-07-20", "2024-07-21", "2024-07-22", "2024-07-28", "2024-07-29", "2024-08-12", "2024-10-13", "2024-10-14", "2024-10-23", "2024-12-05", "2024-12-10", "2024-12-31"]
+HOLIDAYS_TOU_2025_STR = ["2025-01-01", "2025-02-12", "2025-02-26", "2025-04-07", "2025-04-14", "2025-04-15", "2025-05-01", "2025-05-05", "2025-06-03", "2025-07-10", "2025-07-11", "2025-07-28", "2025-08-12", "2025-10-13", "2025-10-23", "2025-12-05", "2025-12-08", "2025-12-10", "2025-12-29", "2025-12-31"]
 
 HOLIDAYS_TOU_DATA = {
     2024: get_all_offpeak_days(2024, HOLIDAYS_TOU_2024_STR),
@@ -90,197 +67,103 @@ PEAK_END = time(21, 59, 59)
 # ==============================================================================
 @st.cache_data(show_spinner=False)
 def parse_data_file(uploaded_file):
-    """อ่านและประมวลผลไฟล์ข้อมูล Load Profile (ฉบับแก้ไข SyntaxError)"""
-    df_final = None
-    file_content_string = ""
-    detected_encoding = None
-    detected_delimiter = None
-    first_line = ""
+    """อ่านและประมวลผลไฟล์ข้อมูล Load Profile"""
+    df_final = None; file_content_string = ""; detected_encoding = None; detected_delimiter = None; first_line = ""
     encodings_to_try = ['utf-8', 'cp874', 'tis-620']
-
     for enc in encodings_to_try:
         try:
-            uploaded_file.seek(0)
-            bytes_content = uploaded_file.getvalue()
-            file_content_string = bytes_content.decode(enc)
-            detected_encoding = enc
-            if file_content_string:
-                first_line = file_content_string.splitlines()[0].strip()
+            uploaded_file.seek(0); bytes_content = uploaded_file.getvalue(); file_content_string = bytes_content.decode(enc)
+            detected_encoding = enc;
+            if file_content_string: first_line = file_content_string.splitlines()[0].strip()
             break
-        except (UnicodeDecodeError, IndexError):
-            continue
-
-    if not detected_encoding or not first_line:
-        raise ValueError("ไม่สามารถอ่านไฟล์ได้ หรือไฟล์ว่างเปล่า")
-
-    if '\t' in first_line:
-        detected_delimiter = '\t'
-    elif ',' in first_line:
-        detected_delimiter = ','
-    else:
-        raise ValueError("ไม่พบตัวคั่นที่รองรับ (Tab หรือ Comma)")
-
+        except (UnicodeDecodeError, IndexError): continue
+    if not detected_encoding or not first_line: raise ValueError("ไม่สามารถอ่านไฟล์ได้ หรือไฟล์ว่างเปล่า")
+    if '\t' in first_line: detected_delimiter = '\t'
+    elif ',' in first_line: detected_delimiter = ','
+    else: raise ValueError("ไม่พบตัวคั่นที่รองรับ (Tab หรือ Comma)")
     data_io = io.StringIO(file_content_string)
-
     try:
         if detected_delimiter == '\t':
             if "DateTime\tTotal import kW demand" in first_line:
-                df = pd.read_csv(data_io, sep='\t', header=0, skipinitialspace=True, low_memory=False)
-                df.columns = df.columns.str.strip()
-                required_cols = ['DateTime', 'Total import kW demand']
-                if not all(col in df.columns for col in required_cols):
-                    raise ValueError(f"ไฟล์ Tab ต้องมีคอลัมน์: {', '.join(required_cols)}")
-                df['DateTime_parsed'] = pd.to_datetime(df['DateTime'], dayfirst=True, errors='coerce')
-                df['Demand_parsed'] = pd.to_numeric(df['Total import kW demand'], errors='coerce')
-                df_final = df.dropna(subset=['DateTime_parsed', 'Demand_parsed']).rename(
-                    columns={'DateTime_parsed': 'DateTime', 'Demand_parsed': 'Total import kW demand'}
-                )[['DateTime', 'Total import kW demand']].copy()
-            else:
-                raise ValueError("ไฟล์ Tab-separated แต่ Header ไม่ตรงกับรูปแบบที่คาดหวัง")
-        
+                df = pd.read_csv(data_io, sep='\t', header=0, skipinitialspace=True, low_memory=False); df.columns = df.columns.str.strip()
+                required_cols = ['DateTime', 'Total import kW demand'];
+                if not all(col in df.columns for col in required_cols): raise ValueError(f"ไฟล์ Tab ต้องมีคอลัมน์: {', '.join(required_cols)}")
+                df['DateTime_parsed'] = pd.to_datetime(df['DateTime'], dayfirst=True, errors='coerce'); df['Demand_parsed'] = pd.to_numeric(df['Total import kW demand'], errors='coerce')
+                df_final = df.dropna(subset=['DateTime_parsed', 'Demand_parsed']).rename(columns={'DateTime_parsed': 'DateTime', 'Demand_parsed': 'Total import kW demand'})[['DateTime', 'Total import kW demand']].copy()
+            else: raise ValueError("ไฟล์ Tab-separated แต่ Header ไม่ตรงกับรูปแบบที่คาดหวัง")
         elif detected_delimiter == ',':
             df_check = pd.read_csv(io.StringIO(file_content_string), sep=',', header=None, skipinitialspace=True, nrows=10, low_memory=False)
-            num_cols = df_check.shape[1]
-            datetime_col_idx = 1
-            demand_col_idx = 3
-            if num_cols <= max(datetime_col_idx, demand_col_idx):
-                raise ValueError("ไฟล์ CSV มีคอลัมน์ไม่เพียงพอ")
-
+            num_cols = df_check.shape[1]; datetime_col_idx = 1; demand_col_idx = 3
+            if num_cols <= max(datetime_col_idx, demand_col_idx): raise ValueError("ไฟล์ CSV มีคอลัมน์ไม่เพียงพอ")
             header_setting = None
             try:
-                first_row_values = df_check.iloc[0].astype(str).tolist()
-                has_text = any(any(c.isalpha() for c in str(item)) for item in first_row_values[:4])
+                first_row_values = df_check.iloc[0].astype(str).tolist(); has_text = any(any(c.isalpha() for c in str(item)) for item in first_row_values[:4])
                 header_setting = 0 if has_text else None
-            except Exception:
-                header_setting = None
-
-            data_io.seek(0)
-            df = pd.read_csv(data_io, sep=',', header=header_setting, skipinitialspace=True, low_memory=False)
-            
-            dt_str_series = df.iloc[:, datetime_col_idx].astype(str).str.strip()
-            dayfirst_guess = False
+            except Exception: header_setting = None
+            data_io.seek(0); df = pd.read_csv(data_io, sep=',', header=header_setting, skipinitialspace=True, low_memory=False)
+            dt_str_series = df.iloc[:, datetime_col_idx].astype(str).str.strip(); dayfirst_guess = False
             potential_dates = dt_str_series[dt_str_series.str.contains(r'[\/\-:]', regex=True, na=False)].head(20)
-            
             for s in potential_dates:
                 if '/' in s:
                     try:
-                        day_part_str = s.split(' ')[0].split('/')[0]
-                        day_part = int(day_part_str)
-                        if day_part > 12:
-                            dayfirst_guess = True
-                            break
-                    except (ValueError, IndexError):
-                        continue
-
+                        day_part_str = s.split(' ')[0].split('/')[0]; day_part = int(day_part_str)
+                        if day_part > 12: dayfirst_guess = True; break
+                    except (ValueError, IndexError): continue
             dt_series = pd.to_datetime(dt_str_series, dayfirst=dayfirst_guess, errors='coerce')
             if dt_series.isnull().sum() > len(df) * 0.9:
                 dt_series_alt = pd.to_datetime(dt_str_series, dayfirst=(not dayfirst_guess), errors='coerce')
-                if dt_series_alt.isnull().sum() < dt_series.isnull().sum():
-                    dt_series = dt_series_alt
-            
-            if dt_series.isnull().all():
-                raise ValueError(f"ไม่สามารถแปลงคอลัมน์ที่ {datetime_col_idx+1} เป็น DateTime")
-            
+                if dt_series_alt.isnull().sum() < dt_series.isnull().sum(): dt_series = dt_series_alt
+            if dt_series.isnull().all(): raise ValueError(f"ไม่สามารถแปลงคอลัมน์ที่ {datetime_col_idx+1} เป็น DateTime")
             demand_series_numeric = pd.to_numeric(df.iloc[:, demand_col_idx], errors='coerce')
-            if demand_series_numeric.isnull().all():
-                raise ValueError(f"ไม่สามารถแปลงคอลัมน์ที่ {demand_col_idx+1} เป็นตัวเลข (Demand)")
-
+            if demand_series_numeric.isnull().all(): raise ValueError(f"ไม่สามารถแปลงคอลัมน์ที่ {demand_col_idx+1} เป็นตัวเลข (Demand)")
             if num_cols >= 8:
-                demand_series_kw = demand_series_numeric / 1000.0
-                st.info("ℹ️ สันนิษฐานว่าหน่วย Demand เป็น Watt (W), จึงหารด้วย 1000")
+                demand_series_kw = demand_series_numeric / 1000.0; st.info("ℹ️ สันนิษฐานว่าหน่วย Demand เป็น Watt (W), จึงหารด้วย 1000")
             else:
-                demand_series_kw = demand_series_numeric
-                st.info("ℹ️ สันนิษฐานว่าหน่วย Demand เป็น Kilowatt (kW)")
-            
-            df_temp = pd.DataFrame({'DateTime': dt_series, 'Total import kW demand': demand_series_kw})
-            df_final = df_temp.dropna(subset=['DateTime', 'Total import kW demand']).copy()
-
-        if df_final is None or df_final.empty:
-            raise ValueError("ไม่พบข้อมูลที่ถูกต้องในไฟล์")
-        
-        df_final['DateTime'] = pd.to_datetime(df_final['DateTime'])
-        df_final['Total import kW demand'] = pd.to_numeric(df_final['Total import kW demand'])
-        df_final = df_final.sort_values(by='DateTime').reset_index(drop=True)
+                demand_series_kw = demand_series_numeric; st.info("ℹ️ สันนิษฐานว่าหน่วย Demand เป็น Kilowatt (kW)")
+            df_temp = pd.DataFrame({'DateTime': dt_series, 'Total import kW demand': demand_series_kw}); df_final = df_temp.dropna(subset=['DateTime', 'Total import kW demand']).copy()
+        if df_final is None or df_final.empty: raise ValueError("ไม่พบข้อมูลที่ถูกต้องในไฟล์")
+        df_final['DateTime'] = pd.to_datetime(df_final['DateTime']); df_final['Total import kW demand'] = pd.to_numeric(df_final['Total import kW demand']); df_final = df_final.sort_values(by='DateTime').reset_index(drop=True)
         return df_final
-        
-    except Exception as e:
-        raise ValueError(f"เกิดข้อผิดพลาดขณะประมวลผลข้อมูล: {e}")
-
+    except Exception as e: raise ValueError(f"เกิดข้อผิดพลาดขณะประมวลผลข้อมูล: {e}")
 
 def classify_tou_period(dt_obj):
-    if not isinstance(dt_obj, datetime):
-        return 'Unknown'
-    current_date = dt_obj.date()
-    current_time = dt_obj.time()
+    if not isinstance(dt_obj, datetime): return 'Unknown'
+    current_date = dt_obj.date(); current_time = dt_obj.time()
     year_holidays = HOLIDAYS_TOU_DATA.get(current_date.year)
     if year_holidays is None:
         if current_date.year not in st.session_state.get('missing_holiday_years', set()):
-            st.warning(f"ไม่พบข้อมูลวันหยุด TOU ปี {current_date.year}")
-            st.session_state.setdefault('missing_holiday_years', set()).add(current_date.year)
+            st.warning(f"ไม่พบข้อมูลวันหยุด TOU ปี {current_date.year}"); st.session_state.setdefault('missing_holiday_years', set()).add(current_date.year)
         return 'Peak' if PEAK_START <= current_time <= PEAK_END else 'Off-Peak'
-    if current_date in year_holidays:
-        return 'Off-Peak'
+    if current_date in year_holidays: return 'Off-Peak'
     return 'Peak' if PEAK_START <= current_time <= PEAK_END else 'Off-Peak'
-
 
 def get_ft_rate(date_in_period):
     d = date_in_period.date() if isinstance(date_in_period, datetime) else date_in_period
     sorted_ft_periods = sorted(FT_RATES.keys(), reverse=True)
     for start_year, start_month in sorted_ft_periods:
-        if d >= date(start_year, start_month, 1):
-            return FT_RATES[(start_year, start_month)]
-    st.warning(f"ไม่พบอัตรา Ft สำหรับ {d}, ใช้ค่า Ft=0.0")
-    return 0.0
-
+        if d >= date(start_year, start_month, 1): return FT_RATES[(start_year, start_month)]
+    st.warning(f"ไม่พบอัตรา Ft สำหรับ {d}, ใช้ค่า Ft=0.0"); return 0.0
 
 def calculate_bill(df_processed, customer_type, tariff_type):
-    if df_processed is None or df_processed.empty:
-        return {"error": "ไม่มีข้อมูลสำหรับคำนวณ"}
-    total_kwh = df_processed['kWh'].sum()
-    data_period_end_dt = df_processed['DateTime'].iloc[-1]
-    kwh_peak, kwh_off_peak = 0.0, 0.0
+    if df_processed is None or df_processed.empty: return {"error": "ไม่มีข้อมูลสำหรับคำนวณ"}
+    total_kwh = df_processed['kWh'].sum(); data_period_end_dt = df_processed['DateTime'].iloc[-1]; kwh_peak, kwh_off_peak = 0.0, 0.0
     if tariff_type == 'tou':
-        df_processed['TOU_Period'] = df_processed['DateTime'].apply(classify_tou_period)
-        kwh_summary = df_processed.groupby('TOU_Period')['kWh'].sum()
-        kwh_peak = kwh_summary.get('Peak', 0.0)
-        kwh_off_peak = kwh_summary.get('Off-Peak', 0.0) + kwh_summary.get('Unknown', 0.0)
+        df_processed['TOU_Period'] = df_processed['DateTime'].apply(classify_tou_period); kwh_summary = df_processed.groupby('TOU_Period')['kWh'].sum()
+        kwh_peak = kwh_summary.get('Peak', 0.0); kwh_off_peak = kwh_summary.get('Off-Peak', 0.0) + kwh_summary.get('Unknown', 0.0)
     try:
-        if customer_type == "residential":
-            tariff_key = "tou" if tariff_type == "tou" else ("normal_le_150" if total_kwh <= 150 else "normal_gt_150")
-            rate_structure = TARIFFS["residential"][tariff_key]
-        elif customer_type == "smb":
-            rate_structure = TARIFFS["smb"][tariff_type]
-        else:
-            raise ValueError("ประเภทผู้ใช้ไม่ถูกต้อง")
-    except KeyError as e:
-        return {"error": f"ไม่พบโครงสร้างอัตราค่าไฟฟ้า: {e}"}
+        if customer_type == "residential": tariff_key = "tou" if tariff_type == "tou" else ("normal_le_150" if total_kwh <= 150 else "normal_gt_150"); rate_structure = TARIFFS["residential"][tariff_key]
+        elif customer_type == "smb": rate_structure = TARIFFS["smb"][tariff_type]
+        else: raise ValueError("ประเภทผู้ใช้ไม่ถูกต้อง")
+    except KeyError as e: return {"error": f"ไม่พบโครงสร้างอัตราค่าไฟฟ้า: {e}"}
     base_energy_cost = 0.0
     if rate_structure['type'] == 'tiered':
         last_limit = 0
-        for tier in rate_structure['tiers']:
-            units_in_tier = max(0, min(total_kwh, tier['limit']) - last_limit)
-            base_energy_cost += units_in_tier * tier['rate']
-            last_limit = tier['limit']
-            if total_kwh <= tier['limit']:
-                break
-    elif rate_structure['type'] == 'tou':
-        base_energy_cost = (kwh_peak * rate_structure['peak_rate']) + (kwh_off_peak * rate_structure['off_peak_rate'])
-    service_charge = rate_structure['service_charge']
-    applicable_ft_rate = get_ft_rate(data_period_end_dt)
-    ft_cost = total_kwh * applicable_ft_rate
-    total_before_vat = base_energy_cost + service_charge + ft_cost
-    vat_amount = total_before_vat * VAT_RATE
-    final_bill = total_before_vat + vat_amount
-    return {
-        "total_kwh": total_kwh, "final_bill": final_bill, "base_energy_cost": base_energy_cost,
-        "service_charge": service_charge, "ft_cost": ft_cost, "total_before_vat": total_before_vat,
-        "vat_amount": vat_amount, "applicable_ft_rate": applicable_ft_rate,
-        "kwh_peak": kwh_peak if tariff_type == 'tou' else None,
-        "kwh_off_peak": kwh_off_peak if tariff_type == 'tou' else None,
-        "data_period_start": df_processed['DateTime'].iloc[0].strftime('%Y-%m-%d %H:%M'),
-        "data_period_end": data_period_end_dt.strftime('%Y-%m-%d %H:%M'), "error": None
-    }
-
+        for tier in rate_structure['tiers']: units_in_tier = max(0, min(total_kwh, tier['limit']) - last_limit); base_energy_cost += units_in_tier * tier['rate']; last_limit = tier['limit'];
+        if total_kwh <= tier['limit']: break
+    elif rate_structure['type'] == 'tou': base_energy_cost = (kwh_peak * rate_structure['peak_rate']) + (kwh_off_peak * rate_structure['off_peak_rate'])
+    service_charge = rate_structure['service_charge']; applicable_ft_rate = get_ft_rate(data_period_end_dt); ft_cost = total_kwh * applicable_ft_rate
+    total_before_vat = base_energy_cost + service_charge + ft_cost; vat_amount = total_before_vat * VAT_RATE; final_bill = total_before_vat + vat_amount
+    return {"total_kwh": total_kwh, "final_bill": final_bill, "base_energy_cost": base_energy_cost, "service_charge": service_charge, "ft_cost": ft_cost, "total_before_vat": total_before_vat, "vat_amount": vat_amount, "applicable_ft_rate": applicable_ft_rate, "kwh_peak": kwh_peak if tariff_type == 'tou' else None, "kwh_off_peak": kwh_off_peak if tariff_type == 'tou' else None, "data_period_start": df_processed['DateTime'].iloc[0].strftime('%Y-%m-%d %H:%M'), "data_period_end": data_period_end_dt.strftime('%Y-%m-%d %H:%M'), "error": None}
 
 # ==============================================================================
 # --- Streamlit App ---
@@ -290,158 +173,115 @@ st.title("📊 โปรแกรมคำนวณและจำลองค�
 st.markdown("อัปโหลดไฟล์ Load Profile (.txt, .csv) เพื่อคำนวณค่าไฟตาม **ช่วงวันที่** ที่ต้องการ และจำลองการใช้งาน EV Charger")
 
 # --- Session State Initialization ---
-for key in ['full_dataframe', 'last_uploaded_filename', 'calculation_result', 'ev_cost']:
-    if key not in st.session_state:
-        st.session_state[key] = None
+for key in ['full_dataframe', 'last_uploaded_filename', 'calculation_result', 'ev_cost', 'base_kwh', 'ev_kwh']:
+    if key not in st.session_state: st.session_state[key] = None
 
 # --- 1. ส่วนอัปโหลดไฟล์ ---
 st.header("1. อัปโหลดไฟล์ข้อมูล Load Profile")
 uploaded_file = st.file_uploader("เลือกไฟล์ (.txt หรือ .csv)", type=['txt', 'csv'], key="file_uploader")
-
 if uploaded_file and uploaded_file.name != st.session_state.last_uploaded_filename:
     with st.spinner('กำลังประมวลผลไฟล์...'):
         try:
-            st.session_state.full_dataframe = parse_data_file(uploaded_file)
-            st.session_state.last_uploaded_filename = uploaded_file.name
+            st.session_state.full_dataframe = parse_data_file(uploaded_file); st.session_state.last_uploaded_filename = uploaded_file.name
             st.success(f"ประมวลผลไฟล์ '{uploaded_file.name}' สำเร็จ")
-        except ValueError as ve:
-            st.error(f"ข้อผิดพลาด: {ve}")
-            st.session_state.full_dataframe = None
+        except ValueError as ve: st.error(f"ข้อผิดพลาด: {ve}"); st.session_state.full_dataframe = None
 
 # --- 2. ส่วนตั้งค่าการคำนวณ ---
 if st.session_state.full_dataframe is not None:
-    st.divider()
-    st.header("2. ตั้งค่าการคำนวณ")
-
-    df_full = st.session_state.full_dataframe
-    min_date = df_full['DateTime'].min().date()
-    max_date = df_full['DateTime'].max().date()
-
+    st.divider(); st.header("2. ตั้งค่าการคำนวณ")
+    df_full = st.session_state.full_dataframe; min_date = df_full['DateTime'].min().date(); max_date = df_full['DateTime'].max().date()
     col1, col2 = st.columns([1, 2])
     with col1:
         customer_type = st.selectbox("ประเภทผู้ใช้:", ["บ้านอยู่อาศัย", "กิจการขนาดเล็ก"], key="customer_type")
         tariff_type = st.selectbox("ประเภทอัตรา:", ["อัตราปกติ", "อัตรา TOU"], key="tariff_type")
-    with col2:
-        date_range = st.date_input("เลือกช่วงวันที่สำหรับคำนวณ", value=(min_date, max_date), min_value=min_date, max_value=max_date, key="date_range")
-    
+    with col2: date_range = st.date_input("เลือกช่วงวันที่สำหรับคำนวณ", value=(min_date, max_date), min_value=min_date, max_value=max_date, key="date_range")
     with st.expander("🔌 จำลอง EV Charger (ตัวเลือกเพิ่มเติม)"):
         ev_enabled = st.checkbox("เปิดใช้งานการจำลอง EV", key="ev_enabled")
         ev_col1, ev_col2, ev_col3 = st.columns(3)
         ev_power_kw = ev_col1.number_input("กำลังไฟ Charger (kW):", min_value=0.1, value=7.0, step=0.1, key="ev_power", disabled=not ev_enabled)
         ev_start_time = ev_col2.time_input("เวลาเริ่มชาร์จ", time(22, 0), key="ev_start_time", disabled=not ev_enabled)
         ev_end_time = ev_col3.time_input("เวลาสิ้นสุดชาร์จ", time(5, 0), key="ev_end_time", disabled=not ev_enabled)
-
     st.divider()
 
     if st.button("คำนวณค่าไฟ", type="primary"):
-        st.session_state.calculation_result = None
-        st.session_state.ev_cost = None
-        
-        if len(date_range) != 2:
-            st.error("กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
+        st.session_state.calculation_result = None; st.session_state.ev_cost = None; st.session_state.base_kwh = None; st.session_state.ev_kwh = None
+        if len(date_range) != 2: st.error("กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
         else:
             start_date, end_date = date_range
             with st.spinner("กำลังคำนวณ..."):
                 try:
                     mask = (df_full['DateTime'].dt.date >= start_date) & (df_full['DateTime'].dt.date <= end_date)
                     df_filtered = df_full[mask].copy()
-                    
-                    if df_filtered.empty:
-                        st.warning("ไม่พบข้อมูลในช่วงวันที่ที่เลือก")
+                    if df_filtered.empty: st.warning("ไม่พบข้อมูลในช่วงวันที่ที่เลือก")
                     else:
-                        customer_key = "residential" if customer_type == "บ้านอยู่อาศัย" else "smb"
-                        tariff_key = "normal" if tariff_type == "อัตราปกติ" else "tou"
-                        
+                        customer_key = "residential" if customer_type == "บ้านอยู่อาศัย" else "smb"; tariff_key = "normal" if tariff_type == "อัตราปกติ" else "tou"
                         interval_hours = (df_filtered['DateTime'].iloc[1] - df_filtered['DateTime'].iloc[0]).total_seconds() / 3600.0 if len(df_filtered) > 1 else 0.25
-                        if not (0 < interval_hours <= 24):
-                            interval_hours = 0.25
-
-                        df_base = df_filtered.copy()
-                        df_base['kWh'] = df_base['Total import kW demand'] * interval_hours
+                        if not (0 < interval_hours <= 24): interval_hours = 0.25
+                        
+                        # --- คำนวณค่าไฟฐานและหน่วยไฟฐาน ---
+                        df_base = df_filtered.copy(); df_base['kWh'] = df_base['Total import kW demand'] * interval_hours
                         base_bill_details = calculate_bill(df_base, customer_key, tariff_key)
+                        st.session_state.base_kwh = base_bill_details['total_kwh'] # เก็บหน่วยไฟฐาน
                         
                         total_bill_details = base_bill_details
                         
+                        # --- คำนวณค่าไฟรวมและหน่วยไฟ EV (ถ้าเปิดใช้งาน) ---
                         if ev_enabled:
                             df_with_ev = df_filtered.copy()
                             time_series = df_with_ev['DateTime'].dt.time
                             charging_mask = (time_series >= ev_start_time) | (time_series < ev_end_time) if ev_start_time > ev_end_time else (time_series >= ev_start_time) & (time_series < ev_end_time)
                             df_with_ev.loc[charging_mask, 'Total import kW demand'] += ev_power_kw
-                            
                             df_with_ev['kWh'] = df_with_ev['Total import kW demand'] * interval_hours
                             total_bill_details = calculate_bill(df_with_ev, customer_key, tariff_key)
                             
                             st.session_state.ev_cost = total_bill_details['final_bill'] - base_bill_details['final_bill']
+                            st.session_state.ev_kwh = total_bill_details['total_kwh'] - base_bill_details['total_kwh'] # เก็บหน่วยไฟ EV
                             st.session_state.df_for_plotting = df_with_ev
-                        else:
-                            st.session_state.df_for_plotting = df_base
-                            
+                        else: st.session_state.df_for_plotting = df_base
                         st.session_state.calculation_result = total_bill_details
-
-                except Exception as e:
-                    st.error(f"เกิดข้อผิดพลาด: {e}")
-                    st.error(traceback.format_exc())
+                except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}"); st.error(traceback.format_exc())
 
 # --- 3. ส่วนแสดงผลลัพธ์ ---
 if st.session_state.calculation_result:
-    st.divider()
-    st.header("3. ผลการคำนวณ")
-    
-    bill = st.session_state.calculation_result
-    ev_cost = st.session_state.ev_cost
-
-    if bill.get("error"):
-        st.error(f"เกิดข้อผิดพลาด: {bill['error']}")
+    st.divider(); st.header("3. ผลการคำนวณ")
+    bill = st.session_state.calculation_result; ev_cost = st.session_state.ev_cost; base_kwh = st.session_state.base_kwh; ev_kwh = st.session_state.ev_kwh
+    if bill.get("error"): st.error(f"เกิดข้อผิดพลาด: {bill['error']}")
     else:
-        cols = st.columns(4 if st.session_state.get('ev_enabled') and ev_cost is not None else 3)
-        cols[0].metric("💰 ยอดค่าไฟรวม", f"{bill['final_bill']:,.2f} บาท")
-        if st.session_state.get('ev_enabled') and ev_cost is not None:
-            cols[1].metric("🚗 ค่าไฟส่วน EV", f"{ev_cost:,.2f} บาท", help="ค่าไฟฟ้าที่เพิ่มขึ้นจากการจำลองชาร์จ EV")
-            cols[2].metric("🏠 ค่าไฟบ้าน (ไม่รวม EV)", f"{bill['final_bill'] - ev_cost:,.2f} บาท")
-            cols[3].metric("⚡️ ยอดใช้ไฟรวม", f"{bill['total_kwh']:,.2f} kWh")
+        # --- ปรับปรุง Metric ให้แสดงหน่วยไฟแยก ---
+        is_ev_calculated = ev_enabled and ev_cost is not None
+        if is_ev_calculated:
+            m_col1, m_col2, m_col3, m_col4 = st.columns(4)
+            m_col1.metric("💰 ยอดค่าไฟรวม", f"{bill['final_bill']:,.2f} บาท")
+            m_col2.metric("🚗 ค่าไฟส่วน EV", f"{ev_cost:,.2f} บาท")
+            m_col3.metric("🏠 หน่วยไฟบ้าน", f"{base_kwh:,.2f} kWh")
+            m_col4.metric("🚗 หน่วยไฟ EV", f"{ev_kwh:,.2f} kWh")
         else:
-            cols[1].metric("⚡️ ยอดใช้ไฟรวม", f"{bill['total_kwh']:,.2f} kWh")
-            cols[2].metric("🔥 อัตรา Ft ที่ใช้", f"{bill['applicable_ft_rate']:.4f}")
+            m_col1, m_col2, m_col3 = st.columns(3)
+            m_col1.metric("💰 ยอดค่าไฟฟ้าสุทธิ", f"{bill['final_bill']:,.2f} บาท")
+            m_col2.metric("⚡️ ยอดใช้ไฟรวม", f"{bill['total_kwh']:,.2f} kWh")
+            m_col3.metric("🔥 อัตรา Ft ที่ใช้", f"{bill['applicable_ft_rate']:.4f}")
 
         with st.expander("📄 ดูรายละเอียดการคำนวณและดาวน์โหลด"):
             output = [
                 "--- ผลการคำนวณค่าไฟฟ้า ---",
                 f"ช่วงข้อมูล: {bill['data_period_start']} ถึง {bill['data_period_end']}",
-                f"ประเภทผู้ใช้: {st.session_state.customer_type}, อัตรา: {st.session_state.tariff_type}",
-            ]
-            if st.session_state.get('ev_enabled', False):
-                output.append(f"จำลอง EV: {st.session_state.ev_power:.2f} kW ({st.session_state.ev_start_time.strftime('%H:%M')} - {st.session_state.ev_end_time.strftime('%H:%M')})")
-            output.extend([
-                "-"*40,
-                f"ยอดใช้ไฟรวม: {bill['total_kwh']:,.2f} kWh",
-            ])
-            if st.session_state.tariff_type == 'อัตรา TOU':
-                output.extend([f"  - Peak: {bill['kwh_peak']:,.2f} kWh", f"  - Off-Peak: {bill['kwh_off_peak']:,.2f} kWh"])
-            output.extend([
-                "-"*40,
-                f"{'ค่าพลังงานไฟฟ้า':<25}: {bill['base_energy_cost']:>12,.2f} บาท",
-                f"{'ค่าบริการรายเดือน':<25}: {bill['service_charge']:>12,.2f} บาท",
-                f"{f'ค่า Ft (@{bill['applicable_ft_rate']:.4f})':<25}: {bill['ft_cost']:>12,.2f} บาท",
-                "-"*40,
-                f"{'ยอดรวมก่อน VAT':<25}: {bill['total_before_vat']:>12,.2f} บาท",
-                f"{f'ภาษีมูลค่าเพิ่ม ({VAT_RATE*100:.0f}%)':<25}: {bill['vat_amount']:>12,.2f} บาท",
-                "="*40
-            ])
-            if st.session_state.get('ev_enabled') and ev_cost is not None:
-                output.extend([
-                    f"{'ค่าไฟบ้าน (ไม่รวม EV)':<25}: {bill['final_bill'] - ev_cost:>12,.2f} บาท",
-                    f"{'ค่าไฟส่วน EV':<25}: {ev_cost:>12,.2f} บาท",
-                    "="*40
-                ])
+                f"ประเภทผู้ใช้: {st.session_state.customer_type}, อัตรา: {st.session_state.tariff_type}",]
+            if is_ev_calculated: output.append(f"จำลอง EV: {st.session_state.ev_power:.2f} kW ({st.session_state.ev_start_time.strftime('%H:%M')} - {st.session_state.ev_end_time.strftime('%H:%M')})")
+            output.extend(["-"*40, f"ยอดใช้ไฟรวม: {bill['total_kwh']:,.2f} kWh"])
+            # --- ปรับปรุงข้อความให้แสดงหน่วยไฟแยก ---
+            if is_ev_calculated: output.extend([f"  - หน่วยไฟบ้าน: {base_kwh:,.2f} kWh", f"  - หน่วยไฟ EV: {ev_kwh:,.2f} kWh"])
+            if st.session_state.tariff_type == 'อัตรา TOU': output.extend([f"  - Peak: {bill['kwh_peak']:,.2f} kWh", f"  - Off-Peak: {bill['kwh_off_peak']:,.2f} kWh"])
+            output.extend(["-"*40, f"{'ค่าพลังงานไฟฟ้า':<25}: {bill['base_energy_cost']:>12,.2f} บาท", f"{'ค่าบริการรายเดือน':<25}: {bill['service_charge']:>12,.2f} บาท", f"{f'ค่า Ft (@{bill['applicable_ft_rate']:.4f})':<25}: {bill['ft_cost']:>12,.2f} บาท", "-"*40, f"{'ยอดรวมก่อน VAT':<25}: {bill['total_before_vat']:>12,.2f} บาท", f"{f'ภาษีมูลค่าเพิ่ม ({VAT_RATE*100:.0f}%)':<25}: {bill['vat_amount']:>12,.2f} บาท", "="*40])
+            if is_ev_calculated: output.extend([f"{'ค่าไฟบ้าน (ไม่รวม EV)':<25}: {bill['final_bill'] - ev_cost:>12,.2f} บาท", f"{'ค่าไฟส่วน EV':<25}: {ev_cost:>12,.2f} บาท", "="*40])
             output.append(f"{'**ยอดค่าไฟฟ้าสุทธิ**':<25}: {bill['final_bill']:>12,.2f} บาท")
             details_text = "\n".join(output)
             st.code(details_text, language=None)
             st.download_button("📥 ดาวน์โหลดผลลัพธ์ (.txt)", details_text.encode('utf-8'), f"bill_result_{datetime.now().strftime('%Y%m%d_%H%M')}.txt", 'text/plain')
-
+        
+        # --- ส่วนแสดงกราฟ ---
         st.subheader("กราฟ Load Profile (kW Demand)")
-        df_plot = st.session_state.get('df_for_plotting')
+        df_plot = st.session_state.get('df_for_plotting');
         if df_plot is not None and not df_plot.empty:
             st.line_chart(df_plot.set_index('DateTime')['Total import kW demand'])
             st.caption("กราฟแสดงการใช้พลังงาน (kW) สำหรับช่วงวันที่ที่เลือก (รวมผลจากการจำลอง EV หากเปิดใช้งาน)")
-        else:
-            st.warning("ไม่มีข้อมูลสำหรับสร้างกราฟ")
+        else: st.warning("ไม่มีข้อมูลสำหรับสร้างกราฟ")
