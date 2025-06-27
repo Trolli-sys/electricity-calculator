@@ -10,39 +10,36 @@ import traceback
 # --- ค่าคงที่และข้อมูลอัตรา (CONFIGURATIONS) ---
 # ==============================================================================
 
-# 1. อัตราค่าไฟฟ้า (Tariffs) - ปรับปรุงตามบิลจริง
+# 1. อัตราค่าไฟฟ้า (Tariffs) - ปรับปรุงตามระดับแรงดัน
 TARIFFS = {
     "residential": {
-        # แก้ไข: ใช้อัตราปกติโครงสร้างเดียวเพื่อให้ตรงกับบิล กฟภ.
         "normal": {'service_charge': 24.62, 'type': 'tiered', 'tiers': [{'limit': 150, 'rate': 3.2484}, {'limit': 400, 'rate': 4.2218}, {'limit': float('inf'), 'rate': 4.4217}]},
         "tou": {'service_charge': 24.62, 'type': 'tou', 'peak_rate': 5.7982, 'off_peak_rate': 2.6369}
     },
-    "smb": {
-        "normal": {'service_charge': 312.24, 'type': 'tiered', 'tiers': [{'limit': 150, 'rate': 3.2484}, {'limit': 400, 'rate': 4.2218}, {'limit': float('inf'), 'rate': 4.4217}]},
-        "tou": {'service_charge': 33.29, 'type': 'tou', 'peak_rate': 5.7982, 'off_peak_rate': 2.6369}
+    "smb_lv": { # กิจการขนาดเล็ก, แรงดันต่ำกว่า 22 kV
+        "normal": {'service_charge': 46.16, 'type': 'tiered', 'tiers': [{'limit': 150, 'rate': 3.2484}, {'limit': 400, 'rate': 4.2218}, {'limit': float('inf'), 'rate': 4.4217}]},
+        "tou": {'service_charge': 46.16, 'type': 'tou', 'peak_rate': 5.7982, 'off_peak_rate': 2.6369}
+    },
+    "smb_mv": { # กิจการขนาดเล็ก, แรงดัน 22-33 kV
+        "normal": {'service_charge': 312.24, 'type': 'flat', 'rate': 4.3168}, # ใช้อัตราเดียว
+        "tou": {'service_charge': 312.24, 'type': 'tou', 'peak_rate': 4.8773, 'off_peak_rate': 2.6549} # อัตรา TOU ก็ต่างกัน
     }
 }
 
-# 2. อัตราค่า Ft (Fuel Adjustment Charge) - ปรับปรุงตามบิลจริง
+# 2. อัตราค่า Ft (Fuel Adjustment Charge)
 FT_RATES = {
-    # ข้อมูลปี 2023
     (2023, 1): 0.9343, (2023, 5): 0.9119, (2023, 9): 0.2048,
-    # ข้อมูลปี 2024
     (2024, 1): 0.3972, (2024, 5): 0.3972, (2024, 9): 0.3972,
-    # ข้อมูลปี 2025
-    (2025, 1): 0.3972, # ม.ค.-เม.ย. (ค่าประมาณ)
-    (2025, 5): 0.1972, # พ.ค.-ส.ค. (ค่าจากบิลจริง)
-    (2025, 9): 0.1972, # ก.ย.-ธ.ค. (ใช้ค่าล่าสุดเป็นค่าประมาณ)
+    (2025, 1): 0.3972, (2025, 5): 0.1972, (2025, 9): 0.1972,
 }
 
 # 3. วันหยุดสำหรับอัตรา TOU
 def get_all_offpeak_days(year, official_holidays_str):
+    # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
     offpeak_days = set()
     for d_str in official_holidays_str:
-        try:
-            offpeak_days.add(datetime.strptime(d_str, "%Y-%m-%d").date())
-        except ValueError:
-            st.warning(f"รูปแบบวันที่ไม่ถูกต้องในรายการวันหยุด: {d_str}")
+        try: offpeak_days.add(datetime.strptime(d_str, "%Y-%m-%d").date())
+        except ValueError: st.warning(f"รูปแบบวันที่ไม่ถูกต้องในรายการวันหยุด: {d_str}")
     for month in range(1, 13):
         cal = calendar.monthcalendar(year, month)
         for week in cal:
@@ -53,23 +50,16 @@ def get_all_offpeak_days(year, official_holidays_str):
 
 HOLIDAYS_TOU_2024_STR = ["2024-01-01", "2024-02-24", "2024-02-26", "2024-04-06", "2024-04-08", "2024-04-13", "2024-04-14", "2024-04-15", "2024-04-16", "2024-05-01", "2024-05-04", "2024-05-06", "2024-05-22", "2024-06-03", "2024-07-20", "2024-07-21", "2024-07-22", "2024-07-28", "2024-07-29", "2024-08-12", "2024-10-13", "2024-10-14", "2024-10-23", "2024-12-05", "2024-12-10", "2024-12-31"]
 HOLIDAYS_TOU_2025_STR = ["2025-01-01", "2025-02-12", "2025-02-26", "2025-04-07", "2025-04-14", "2025-04-15", "2025-05-01", "2025-05-05", "2025-06-03", "2025-07-10", "2025-07-11", "2025-07-28", "2025-08-12", "2025-10-13", "2025-10-23", "2025-12-05", "2025-12-08", "2025-12-10", "2025-12-29", "2025-12-31"]
-
-HOLIDAYS_TOU_DATA = {
-    2024: get_all_offpeak_days(2024, HOLIDAYS_TOU_2024_STR),
-    2025: get_all_offpeak_days(2025, HOLIDAYS_TOU_2025_STR),
-}
+HOLIDAYS_TOU_DATA = {2024: get_all_offpeak_days(2024, HOLIDAYS_TOU_2024_STR), 2025: get_all_offpeak_days(2025, HOLIDAYS_TOU_2025_STR)}
 
 # 4. ค่าคงที่อื่นๆ
-VAT_RATE = 0.07
-PEAK_START = time(9, 0, 0)
-PEAK_END = time(21, 59, 59)
+VAT_RATE = 0.07; PEAK_START = time(9, 0, 0); PEAK_END = time(21, 59, 59)
 
 # ==============================================================================
 # --- ฟังก์ชัน Helper ---
 # ==============================================================================
 @st.cache_data(show_spinner=False)
 def parse_data_file(uploaded_file):
-    """อ่านและประมวลผลไฟล์ข้อมูล Load Profile"""
     # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
     df_final = None; file_content_string = ""; detected_encoding = None; detected_delimiter = None; first_line = ""
     encodings_to_try = ['utf-8', 'cp874', 'tis-620']
@@ -149,72 +139,40 @@ def get_ft_rate(date_in_period):
         if d >= date(start_year, start_month, 1): return FT_RATES[(start_year, start_month)]
     st.warning(f"ไม่พบอัตรา Ft สำหรับ {d}, ใช้ค่า Ft=0.0"); return 0.0
 
-def calculate_bill(df_processed, customer_type, tariff_type):
-    """คำนวณค่าไฟฟ้า - ปรับปรุงตรรกะการเลือกอัตราให้แม่นยำขึ้น"""
-    if df_processed is None or df_processed.empty:
-        return {"error": "ไม่มีข้อมูลสำหรับคำนวณ"}
-    
-    total_kwh = df_processed['kWh'].sum()
-    data_period_end_dt = df_processed['DateTime'].iloc[-1]
-    kwh_peak, kwh_off_peak = 0.0, 0.0
-    
-    if tariff_type == 'tou':
-        df_processed['TOU_Period'] = df_processed['DateTime'].apply(classify_tou_period)
-        kwh_summary = df_processed.groupby('TOU_Period')['kWh'].sum()
-        kwh_peak = kwh_summary.get('Peak', 0.0)
-        kwh_off_peak = kwh_summary.get('Off-Peak', 0.0) + kwh_summary.get('Unknown', 0.0)
-        
+def calculate_bill(df_processed, customer_type_key, tariff_type_key):
+    """คำนวณค่าไฟฟ้า - ปรับปรุงให้รองรับ Flat Rate"""
+    if df_processed is None or df_processed.empty: return {"error": "ไม่มีข้อมูลสำหรับคำนวณ"}
+    total_kwh = df_processed['kWh'].sum(); data_period_end_dt = df_processed['DateTime'].iloc[-1]; kwh_peak, kwh_off_peak = 0.0, 0.0
+    if tariff_type_key == 'tou':
+        df_processed['TOU_Period'] = df_processed['DateTime'].apply(classify_tou_period); kwh_summary = df_processed.groupby('TOU_Period')['kWh'].sum()
+        kwh_peak = kwh_summary.get('Peak', 0.0); kwh_off_peak = kwh_summary.get('Off-Peak', 0.0) + kwh_summary.get('Unknown', 0.0)
     try:
-        # --- ตรรกะที่แก้ไข ---
-        # เลือกโครงสร้างอัตราตามประเภทผู้ใช้และประเภทอัตรา (Normal/TOU) เท่านั้น
-        # โดยไม่แยกตามปริมาณการใช้ไฟสำหรับบ้านอยู่อาศัยอีกต่อไป
-        tariff_key = "tou" if tariff_type == "tou" else "normal"
-        rate_structure = TARIFFS[customer_type][tariff_key]
-
-    except KeyError as e:
-        return {"error": f"ไม่พบโครงสร้างอัตราค่าไฟฟ้าสำหรับ '{customer_type}'/'{tariff_key}': {e}"}
-        
+        rate_structure = TARIFFS[customer_type_key][tariff_type_key]
+    except KeyError as e: return {"error": f"ไม่พบโครงสร้างอัตราค่าไฟฟ้าสำหรับ '{customer_type_key}'/'{tariff_type_key}': {e}"}
     base_energy_cost = 0.0
-    if rate_structure['type'] == 'tiered':
+    # --- ตรรกะที่เพิ่มเข้ามา ---
+    if rate_structure['type'] == 'flat':
+        base_energy_cost = total_kwh * rate_structure['rate']
+    elif rate_structure['type'] == 'tiered':
         last_limit = 0
         for tier in rate_structure['tiers']:
-            units_in_tier = max(0, min(total_kwh, tier['limit']) - last_limit)
-            base_energy_cost += units_in_tier * tier['rate']
-            last_limit = tier['limit']
-            if total_kwh <= tier['limit']:
-                break
-    elif rate_structure['type'] == 'tou':
-        base_energy_cost = (kwh_peak * rate_structure['peak_rate']) + (kwh_off_peak * rate_structure['off_peak_rate'])
-        
-    service_charge = rate_structure['service_charge']
-    applicable_ft_rate = get_ft_rate(data_period_end_dt)
-    ft_cost = total_kwh * applicable_ft_rate
-    total_before_vat = base_energy_cost + service_charge + ft_cost
-    vat_amount = total_before_vat * VAT_RATE
-    final_bill = total_before_vat + vat_amount
-    
-    return {
-        "total_kwh": total_kwh, "final_bill": final_bill, "base_energy_cost": base_energy_cost,
-        "service_charge": service_charge, "ft_cost": ft_cost, "total_before_vat": total_before_vat,
-        "vat_amount": vat_amount, "applicable_ft_rate": applicable_ft_rate,
-        "kwh_peak": kwh_peak if tariff_type == 'tou' else None,
-        "kwh_off_peak": kwh_off_peak if tariff_type == 'tou' else None,
-        "data_period_start": df_processed['DateTime'].iloc[0].strftime('%Y-%m-%d %H:%M'),
-        "data_period_end": data_period_end_dt.strftime('%Y-%m-%d %H:%M'), "error": None
-    }
+            units_in_tier = max(0, min(total_kwh, tier['limit']) - last_limit); base_energy_cost += units_in_tier * tier['rate']; last_limit = tier['limit'];
+            if total_kwh <= tier['limit']: break
+    elif rate_structure['type'] == 'tou': base_energy_cost = (kwh_peak * rate_structure['peak_rate']) + (kwh_off_peak * rate_structure['off_peak_rate'])
+    service_charge = rate_structure['service_charge']; applicable_ft_rate = get_ft_rate(data_period_end_dt); ft_cost = total_kwh * applicable_ft_rate
+    total_before_vat = base_energy_cost + service_charge + ft_cost; vat_amount = total_before_vat * VAT_RATE; final_bill = total_before_vat + vat_amount
+    return {"total_kwh": total_kwh, "final_bill": final_bill, "base_energy_cost": base_energy_cost, "service_charge": service_charge, "ft_cost": ft_cost, "total_before_vat": total_before_vat, "vat_amount": vat_amount, "applicable_ft_rate": applicable_ft_rate, "kwh_peak": kwh_peak if tariff_type_key == 'tou' else None, "kwh_off_peak": kwh_off_peak if tariff_type_key == 'tou' else None, "data_period_start": df_processed['DateTime'].iloc[0].strftime('%Y-%m-%d %H:%M'), "data_period_end": data_period_end_dt.strftime('%Y-%m-%d %H:%M'), "error": None}
 
 # ==============================================================================
-# --- Streamlit App (ส่วน UI ไม่มีการเปลี่ยนแปลงตรรกะหลัก) ---
+# --- Streamlit App ---
 # ==============================================================================
 st.set_page_config(page_title="คำนวณค่าไฟฟ้า", layout="wide")
 st.title("📊 โปรแกรมคำนวณและจำลองค่าไฟฟ้า")
 st.markdown("อัปโหลดไฟล์ Load Profile (.txt, .csv) เพื่อคำนวณค่าไฟตาม **ช่วงวันที่** ที่ต้องการ และจำลองการใช้งาน EV Charger")
 
-# --- Session State Initialization ---
 for key in ['full_dataframe', 'last_uploaded_filename', 'calculation_result', 'ev_cost', 'base_kwh', 'ev_kwh']:
     if key not in st.session_state: st.session_state[key] = None
 
-# --- 1. ส่วนอัปโหลดไฟล์ ---
 st.header("1. อัปโหลดไฟล์ข้อมูล Load Profile")
 uploaded_file = st.file_uploader("เลือกไฟล์ (.txt หรือ .csv)", type=['txt', 'csv'], key="file_uploader")
 if uploaded_file and uploaded_file.name != st.session_state.last_uploaded_filename:
@@ -224,18 +182,32 @@ if uploaded_file and uploaded_file.name != st.session_state.last_uploaded_filena
             st.success(f"ประมวลผลไฟล์ '{uploaded_file.name}' สำเร็จ")
         except ValueError as ve: st.error(f"ข้อผิดพลาด: {ve}"); st.session_state.full_dataframe = None
 
-# --- 2. ส่วนตั้งค่าการคำนวณ ---
 if st.session_state.full_dataframe is not None:
     st.divider(); st.header("2. ตั้งค่าการคำนวณ")
     df_full = st.session_state.full_dataframe; min_date = df_full['DateTime'].min().date(); max_date = df_full['DateTime'].max().date()
+    
     col1, col2 = st.columns([1, 2])
     with col1:
-        customer_type = st.selectbox("ประเภทผู้ใช้:", ["บ้านอยู่อาศัย", "กิจการขนาดเล็ก"], key="customer_type")
+        customer_label = st.selectbox("ประเภทผู้ใช้:", ["บ้านอยู่อาศัย", "กิจการขนาดเล็ก"], key="customer_type_label")
+        
+        # --- ตรรกะที่เพิ่มเข้ามา: แสดงตัวเลือกแรงดันไฟฟ้าเมื่อเป็นกิจการขนาดเล็ก ---
+        customer_key = "residential"
+        if customer_label == "กิจการขนาดเล็ก":
+            voltage_label = st.radio(
+                "ระดับแรงดันไฟฟ้า:",
+                ("แรงดันต่ำกว่า 22 kV", "แรงดัน 22-33 kV"),
+                key="voltage_level",
+                horizontal=True
+            )
+            customer_key = "smb_lv" if voltage_label == "แรงดันต่ำกว่า 22 kV" else "smb_mv"
+        
         tariff_type = st.selectbox("ประเภทอัตรา:", ["อัตราปกติ", "อัตรา TOU"], key="tariff_type")
+        
     with col2:
         main_date_range = st.date_input("เลือกช่วงวันที่สำหรับคำนวณ", value=(min_date, max_date), min_value=min_date, max_value=max_date, key="main_date_range")
 
     with st.expander("🔌 จำลอง EV Charger (ตัวเลือกเพิ่มเติม)"):
+        # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
         ev_enabled = st.checkbox("เปิดใช้งานการจำลอง EV", key="ev_enabled")
         if len(main_date_range) == 2:
             ev_start_range, ev_end_range = main_date_range
@@ -247,6 +219,7 @@ if st.session_state.full_dataframe is not None:
     st.divider()
 
     if st.button("คำนวณค่าไฟ", type="primary"):
+        # ... (ตรรกะการคำนวณส่วนใหญ่เหมือนเดิม)
         st.session_state.calculation_result = None; st.session_state.ev_cost = None; st.session_state.base_kwh = None; st.session_state.ev_kwh = None
         if len(main_date_range) != 2: st.error("กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
         else:
@@ -257,7 +230,6 @@ if st.session_state.full_dataframe is not None:
                     df_filtered = df_full[mask].copy()
                     if df_filtered.empty: st.warning("ไม่พบข้อมูลในช่วงวันที่ที่เลือก")
                     else:
-                        customer_key = "residential" if customer_type == "บ้านอยู่อาศัย" else "smb"
                         tariff_key_str = "tou" if tariff_type == "อัตรา TOU" else "normal"
                         
                         interval_hours = (df_filtered['DateTime'].iloc[1] - df_filtered['DateTime'].iloc[0]).total_seconds() / 3600.0 if len(df_filtered) > 1 else 0.25
@@ -289,6 +261,7 @@ if st.session_state.full_dataframe is not None:
 
 # --- 3. ส่วนแสดงผลลัพธ์ ---
 if st.session_state.calculation_result:
+    # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
     st.divider(); st.header("3. ผลการคำนวณ")
     bill = st.session_state.calculation_result; ev_cost = st.session_state.ev_cost; base_kwh = st.session_state.base_kwh; ev_kwh = st.session_state.ev_kwh
     if bill.get("error"): st.error(f"เกิดข้อผิดพลาด: {bill['error']}")
@@ -307,10 +280,15 @@ if st.session_state.calculation_result:
             m_col3.metric("🔥 อัตรา Ft ที่ใช้", f"{bill['applicable_ft_rate']:.4f}")
 
         with st.expander("📄 ดูรายละเอียดการคำนวณและดาวน์โหลด"):
+            # สร้าง Label ที่จะแสดงผล
+            display_customer_label = st.session_state.customer_type_label
+            if st.session_state.customer_type_label == "กิจการขนาดเล็ก":
+                display_customer_label += f" ({st.session_state.voltage_level})"
+
             output = [
                 "--- ผลการคำนวณค่าไฟฟ้า ---",
                 f"ช่วงข้อมูล: {bill['data_period_start']} ถึง {bill['data_period_end']}",
-                f"ประเภทผู้ใช้: {st.session_state.customer_type}, อัตรา: {st.session_state.tariff_type}",]
+                f"ประเภทผู้ใช้: {display_customer_label}, อัตรา: {st.session_state.tariff_type}",]
             if is_ev_calculated:
                 ev_start_date_str = st.session_state.ev_date_range[0].strftime('%d/%m/%Y')
                 ev_end_date_str = st.session_state.ev_date_range[1].strftime('%d/%m/%Y')
