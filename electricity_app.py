@@ -68,6 +68,7 @@ PEAK_END = time(21, 59, 59)
 @st.cache_data(show_spinner=False)
 def parse_data_file(uploaded_file):
     """อ่านและประมวลผลไฟล์ข้อมูล Load Profile"""
+    # ... (โค้ดส่วนนี้เหมือนเดิม)
     df_final = None; file_content_string = ""; detected_encoding = None; detected_delimiter = None; first_line = ""
     encodings_to_try = ['utf-8', 'cp874', 'tis-620']
     for enc in encodings_to_try:
@@ -127,6 +128,7 @@ def parse_data_file(uploaded_file):
     except Exception as e: raise ValueError(f"เกิดข้อผิดพลาดขณะประมวลผลข้อมูล: {e}")
 
 def classify_tou_period(dt_obj):
+    # ... (โค้ดส่วนนี้เหมือนเดิม)
     if not isinstance(dt_obj, datetime): return 'Unknown'
     current_date = dt_obj.date(); current_time = dt_obj.time()
     year_holidays = HOLIDAYS_TOU_DATA.get(current_date.year)
@@ -138,6 +140,7 @@ def classify_tou_period(dt_obj):
     return 'Peak' if PEAK_START <= current_time <= PEAK_END else 'Off-Peak'
 
 def get_ft_rate(date_in_period):
+    # ... (โค้ดส่วนนี้เหมือนเดิม)
     d = date_in_period.date() if isinstance(date_in_period, datetime) else date_in_period
     sorted_ft_periods = sorted(FT_RATES.keys(), reverse=True)
     for start_year, start_month in sorted_ft_periods:
@@ -145,59 +148,27 @@ def get_ft_rate(date_in_period):
     st.warning(f"ไม่พบอัตรา Ft สำหรับ {d}, ใช้ค่า Ft=0.0"); return 0.0
 
 def calculate_bill(df_processed, customer_type, tariff_type):
-    if df_processed is None or df_processed.empty:
-        return {"error": "ไม่มีข้อมูลสำหรับคำนวณ"}
-    
-    total_kwh = df_processed['kWh'].sum()
-    data_period_end_dt = df_processed['DateTime'].iloc[-1]
-    kwh_peak, kwh_off_peak = 0.0, 0.0
-    
+    # ... (โค้ดส่วนนี้เหมือนเดิม)
+    if df_processed is None or df_processed.empty: return {"error": "ไม่มีข้อมูลสำหรับคำนวณ"}
+    total_kwh = df_processed['kWh'].sum(); data_period_end_dt = df_processed['DateTime'].iloc[-1]; kwh_peak, kwh_off_peak = 0.0, 0.0
     if tariff_type == 'tou':
-        df_processed['TOU_Period'] = df_processed['DateTime'].apply(classify_tou_period)
-        kwh_summary = df_processed.groupby('TOU_Period')['kWh'].sum()
-        kwh_peak = kwh_summary.get('Peak', 0.0)
-        kwh_off_peak = kwh_summary.get('Off-Peak', 0.0) + kwh_summary.get('Unknown', 0.0)
-        
+        df_processed['TOU_Period'] = df_processed['DateTime'].apply(classify_tou_period); kwh_summary = df_processed.groupby('TOU_Period')['kWh'].sum()
+        kwh_peak = kwh_summary.get('Peak', 0.0); kwh_off_peak = kwh_summary.get('Off-Peak', 0.0) + kwh_summary.get('Unknown', 0.0)
     try:
-        if customer_type == "residential":
-            tariff_key = "tou" if tariff_type == "tou" else ("normal_le_150" if total_kwh <= 150 else "normal_gt_150")
-            rate_structure = TARIFFS["residential"][tariff_key]
-        elif customer_type == "smb":
-            rate_structure = TARIFFS["smb"][tariff_key]
-        else:
-            raise ValueError("ประเภทผู้ใช้ไม่ถูกต้อง")
-    except KeyError as e:
-        return {"error": f"ไม่พบโครงสร้างอัตราค่าไฟฟ้า: {e}"}
-        
+        if customer_type == "residential": tariff_key = "tou" if tariff_type == "tou" else ("normal_le_150" if total_kwh <= 150 else "normal_gt_150"); rate_structure = TARIFFS["residential"][tariff_key]
+        elif customer_type == "smb": rate_structure = TARIFFS["smb"][tariff_type]
+        else: raise ValueError("ประเภทผู้ใช้ไม่ถูกต้อง")
+    except KeyError as e: return {"error": f"ไม่พบโครงสร้างอัตราค่าไฟฟ้า: {e}"}
     base_energy_cost = 0.0
     if rate_structure['type'] == 'tiered':
         last_limit = 0
         for tier in rate_structure['tiers']:
-            units_in_tier = max(0, min(total_kwh, tier['limit']) - last_limit)
-            base_energy_cost += units_in_tier * tier['rate']
-            last_limit = tier['limit']
-            # --- บรรทัดที่แก้ไข: ย้ายเข้ามาใน loop ---
-            if total_kwh <= tier['limit']:
-                break
-    elif rate_structure['type'] == 'tou':
-        base_energy_cost = (kwh_peak * rate_structure['peak_rate']) + (kwh_off_peak * rate_structure['off_peak_rate'])
-        
-    service_charge = rate_structure['service_charge']
-    applicable_ft_rate = get_ft_rate(data_period_end_dt)
-    ft_cost = total_kwh * applicable_ft_rate
-    total_before_vat = base_energy_cost + service_charge + ft_cost
-    vat_amount = total_before_vat * VAT_RATE
-    final_bill = total_before_vat + vat_amount
-    
-    return {
-        "total_kwh": total_kwh, "final_bill": final_bill, "base_energy_cost": base_energy_cost,
-        "service_charge": service_charge, "ft_cost": ft_cost, "total_before_vat": total_before_vat,
-        "vat_amount": vat_amount, "applicable_ft_rate": applicable_ft_rate,
-        "kwh_peak": kwh_peak if tariff_type == 'tou' else None,
-        "kwh_off_peak": kwh_off_peak if tariff_type == 'tou' else None,
-        "data_period_start": df_processed['DateTime'].iloc[0].strftime('%Y-%m-%d %H:%M'),
-        "data_period_end": data_period_end_dt.strftime('%Y-%m-%d %H:%M'), "error": None
-    }
+            units_in_tier = max(0, min(total_kwh, tier['limit']) - last_limit); base_energy_cost += units_in_tier * tier['rate']; last_limit = tier['limit'];
+            if total_kwh <= tier['limit']: break
+    elif rate_structure['type'] == 'tou': base_energy_cost = (kwh_peak * rate_structure['peak_rate']) + (kwh_off_peak * rate_structure['off_peak_rate'])
+    service_charge = rate_structure['service_charge']; applicable_ft_rate = get_ft_rate(data_period_end_dt); ft_cost = total_kwh * applicable_ft_rate
+    total_before_vat = base_energy_cost + service_charge + ft_cost; vat_amount = total_before_vat * VAT_RATE; final_bill = total_before_vat + vat_amount
+    return {"total_kwh": total_kwh, "final_bill": final_bill, "base_energy_cost": base_energy_cost, "service_charge": service_charge, "ft_cost": ft_cost, "total_before_vat": total_before_vat, "vat_amount": vat_amount, "applicable_ft_rate": applicable_ft_rate, "kwh_peak": kwh_peak if tariff_type == 'tou' else None, "kwh_off_peak": kwh_off_peak if tariff_type == 'tou' else None, "data_period_start": df_processed['DateTime'].iloc[0].strftime('%Y-%m-%d %H:%M'), "data_period_end": data_period_end_dt.strftime('%Y-%m-%d %H:%M'), "error": None}
 
 # ==============================================================================
 # --- Streamlit App ---
@@ -228,23 +199,41 @@ if st.session_state.full_dataframe is not None:
     with col1:
         customer_type = st.selectbox("ประเภทผู้ใช้:", ["บ้านอยู่อาศัย", "กิจการขนาดเล็ก"], key="customer_type")
         tariff_type = st.selectbox("ประเภทอัตรา:", ["อัตราปกติ", "อัตรา TOU"], key="tariff_type")
-    with col2: date_range = st.date_input("เลือกช่วงวันที่สำหรับคำนวณ", value=(min_date, max_date), min_value=min_date, max_value=max_date, key="date_range")
+    with col2:
+        main_date_range = st.date_input("เลือกช่วงวันที่สำหรับคำนวณ", value=(min_date, max_date), min_value=min_date, max_value=max_date, key="main_date_range")
+
+    # --- ส่วนจำลอง EV Charger (ปรับปรุงใหม่) ---
     with st.expander("🔌 จำลอง EV Charger (ตัวเลือกเพิ่มเติม)"):
         ev_enabled = st.checkbox("เปิดใช้งานการจำลอง EV", key="ev_enabled")
+        
+        # --- เพิ่มตัวเลือกวันที่สำหรับ EV ---
+        if len(main_date_range) == 2:
+            ev_start_range, ev_end_range = main_date_range
+            ev_date_range = st.date_input(
+                "เลือกช่วงวันที่สำหรับชาร์จ EV",
+                value=(ev_start_range, ev_end_range),
+                min_value=ev_start_range,
+                max_value=ev_end_range,
+                key="ev_date_range",
+                disabled=not ev_enabled,
+                help="กำหนดช่วงวันที่ที่ต้องการให้มีการชาร์จ EV เกิดขึ้น"
+            )
+
         ev_col1, ev_col2, ev_col3 = st.columns(3)
         ev_power_kw = ev_col1.number_input("กำลังไฟ Charger (kW):", min_value=0.1, value=7.0, step=0.1, key="ev_power", disabled=not ev_enabled)
         ev_start_time = ev_col2.time_input("เวลาเริ่มชาร์จ", time(22, 0), key="ev_start_time", disabled=not ev_enabled)
         ev_end_time = ev_col3.time_input("เวลาสิ้นสุดชาร์จ", time(5, 0), key="ev_end_time", disabled=not ev_enabled)
+        
     st.divider()
 
     if st.button("คำนวณค่าไฟ", type="primary"):
         st.session_state.calculation_result = None; st.session_state.ev_cost = None; st.session_state.base_kwh = None; st.session_state.ev_kwh = None
-        if len(date_range) != 2: st.error("กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
+        if len(main_date_range) != 2: st.error("กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
         else:
-            start_date, end_date = date_range
+            main_start_date, main_end_date = main_date_range
             with st.spinner("กำลังคำนวณ..."):
                 try:
-                    mask = (df_full['DateTime'].dt.date >= start_date) & (df_full['DateTime'].dt.date <= end_date)
+                    mask = (df_full['DateTime'].dt.date >= main_start_date) & (df_full['DateTime'].dt.date <= main_end_date)
                     df_filtered = df_full[mask].copy()
                     if df_filtered.empty: st.warning("ไม่พบข้อมูลในช่วงวันที่ที่เลือก")
                     else:
@@ -252,24 +241,31 @@ if st.session_state.full_dataframe is not None:
                         interval_hours = (df_filtered['DateTime'].iloc[1] - df_filtered['DateTime'].iloc[0]).total_seconds() / 3600.0 if len(df_filtered) > 1 else 0.25
                         if not (0 < interval_hours <= 24): interval_hours = 0.25
                         
-                        # --- คำนวณค่าไฟฐานและหน่วยไฟฐาน ---
                         df_base = df_filtered.copy(); df_base['kWh'] = df_base['Total import kW demand'] * interval_hours
                         base_bill_details = calculate_bill(df_base, customer_key, tariff_key)
-                        st.session_state.base_kwh = base_bill_details['total_kwh'] # เก็บหน่วยไฟฐาน
+                        st.session_state.base_kwh = base_bill_details['total_kwh']
                         
                         total_bill_details = base_bill_details
                         
-                        # --- คำนวณค่าไฟรวมและหน่วยไฟ EV (ถ้าเปิดใช้งาน) ---
                         if ev_enabled:
                             df_with_ev = df_filtered.copy()
+                            # --- สร้าง Mask สำหรับช่วงเวลาและช่วงวันที่ของ EV ---
                             time_series = df_with_ev['DateTime'].dt.time
-                            charging_mask = (time_series >= ev_start_time) | (time_series < ev_end_time) if ev_start_time > ev_end_time else (time_series >= ev_start_time) & (time_series < ev_end_time)
-                            df_with_ev.loc[charging_mask, 'Total import kW demand'] += ev_power_kw
+                            date_series = df_with_ev['DateTime'].dt.date
+                            
+                            ev_start_date_select, ev_end_date_select = st.session_state.ev_date_range
+                            
+                            time_mask = (time_series >= ev_start_time) | (time_series < ev_end_time) if ev_start_time > ev_end_time else (time_series >= ev_start_time) & (time_series < ev_end_time)
+                            date_mask = (date_series >= ev_start_date_select) & (date_series <= ev_end_date_select)
+                            
+                            # --- ใช้ Mask ทั้งสองอันในการเพิ่มโหลด ---
+                            df_with_ev.loc[time_mask & date_mask, 'Total import kW demand'] += ev_power_kw
+                            
                             df_with_ev['kWh'] = df_with_ev['Total import kW demand'] * interval_hours
                             total_bill_details = calculate_bill(df_with_ev, customer_key, tariff_key)
                             
                             st.session_state.ev_cost = total_bill_details['final_bill'] - base_bill_details['final_bill']
-                            st.session_state.ev_kwh = total_bill_details['total_kwh'] - base_bill_details['total_kwh'] # เก็บหน่วยไฟ EV
+                            st.session_state.ev_kwh = total_bill_details['total_kwh'] - base_bill_details['total_kwh']
                             st.session_state.df_for_plotting = df_with_ev
                         else: st.session_state.df_for_plotting = df_base
                         st.session_state.calculation_result = total_bill_details
@@ -299,7 +295,12 @@ if st.session_state.calculation_result:
                 "--- ผลการคำนวณค่าไฟฟ้า ---",
                 f"ช่วงข้อมูล: {bill['data_period_start']} ถึง {bill['data_period_end']}",
                 f"ประเภทผู้ใช้: {st.session_state.customer_type}, อัตรา: {st.session_state.tariff_type}",]
-            if is_ev_calculated: output.append(f"จำลอง EV: {st.session_state.ev_power:.2f} kW ({st.session_state.ev_start_time.strftime('%H:%M')} - {st.session_state.ev_end_time.strftime('%H:%M')})")
+            if is_ev_calculated:
+                ev_start_date_str = st.session_state.ev_date_range[0].strftime('%d/%m/%Y')
+                ev_end_date_str = st.session_state.ev_date_range[1].strftime('%d/%m/%Y')
+                output.append(f"จำลอง EV: {st.session_state.ev_power:.2f} kW ({st.session_state.ev_start_time.strftime('%H:%M')} - {st.session_state.ev_end_time.strftime('%H:%M')})")
+                output.append(f"          (ช่วงวันที่ชาร์จ: {ev_start_date_str} - {ev_end_date_str})")
+            
             output.extend(["-"*40, f"ยอดใช้ไฟรวม: {bill['total_kwh']:,.2f} kWh"])
             if is_ev_calculated: output.extend([f"  - หน่วยไฟบ้าน: {base_kwh:,.2f} kWh", f"  - หน่วยไฟ EV: {ev_kwh:,.2f} kWh"])
             if st.session_state.tariff_type == 'อัตรา TOU': output.extend([f"  - Peak: {bill['kwh_peak']:,.2f} kWh", f"  - Off-Peak: {bill['kwh_off_peak']:,.2f} kWh"])
