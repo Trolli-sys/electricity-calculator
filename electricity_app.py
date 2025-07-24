@@ -61,10 +61,11 @@ VAT_RATE = 0.07; PEAK_START = time(9, 0, 0); PEAK_END = time(21, 59, 59)
 def parse_data_file(uploaded_file, file_type):
     if uploaded_file is None: return None
     
-    df = None
+    df = None # กำหนดค่าเริ่มต้นให้ df
 
     try:
-        if file_type in ['BLE-iMeter', 'IPG']:
+        # --- ตรวจจับ Encoding สำหรับไฟล์ Text ---
+        if file_type in ['BLE-iMeter', 'IPG', 'มิเตอร์ PEA (CSV)']:
             file_content_string = ""
             encodings_to_try = ['utf-8', 'cp874', 'tis-620']
             for enc in encodings_to_try:
@@ -106,17 +107,16 @@ def parse_data_file(uploaded_file, file_type):
                 })
                 st.info("ℹ️ หน่วย Demand ในไฟล์ IPG เป็น Kilowatt (kW)")
 
-        elif file_type == 'มิเตอร์ PEA (CSV)':
-            uploaded_file.seek(0)
-            df_raw = pd.read_csv(uploaded_file, header=0, low_memory=False)
-            required_cols = ['DateTime', 'Total import kW demand']
-            if not all(col in df_raw.columns for col in required_cols):
-                raise ValueError(f"ไฟล์ CSV ต้องมีคอลัมน์ชื่อ '{required_cols[0]}' และ '{required_cols[1]}'")
-            df = pd.DataFrame({
-                'DateTime': pd.to_datetime(df_raw['DateTime'], dayfirst=True, errors='coerce'),
-                'Total import kW demand': pd.to_numeric(df_raw['Total import kW demand'], errors='coerce')
-            })
-            st.info("ℹ️ สันนิษฐานว่าหน่วย Demand ในไฟล์ CSV เป็น Kilowatt (kW)")
+            elif file_type == 'มิเตอร์ PEA (CSV)':
+                df_raw = pd.read_csv(data_io, sep=',', header=0, low_memory=False)
+                required_cols = ['DateTime', 'Total import kW demand']
+                if not all(col in df_raw.columns for col in required_cols):
+                    raise ValueError(f"ไฟล์ CSV ต้องมีคอลัมน์ชื่อ '{required_cols[0]}' และ '{required_cols[1]}'")
+                df = pd.DataFrame({
+                    'DateTime': pd.to_datetime(df_raw['DateTime'], dayfirst=True, errors='coerce'),
+                    'Total import kW demand': pd.to_numeric(df_raw['Total import kW demand'], errors='coerce')
+                })
+                st.info("ℹ️ สันนิษฐานว่าหน่วย Demand ในไฟล์ CSV เป็น Kilowatt (kW)")
 
         if df is None:
             raise ValueError(f"ประเภทไฟล์ '{file_type}' ไม่รองรับหรือไม่สามารถประมวลผลได้")
