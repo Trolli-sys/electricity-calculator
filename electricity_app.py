@@ -61,52 +61,56 @@ VAT_RATE = 0.07; PEAK_START = time(9, 0, 0); PEAK_END = time(21, 59, 59)
 def parse_data_file(uploaded_file, file_type):
     if uploaded_file is None: return None
     
-    df = None # --- แก้ไข: กำหนดค่าเริ่มต้นให้ df ---
+    df = None # กำหนดค่าเริ่มต้นให้ df
 
     try:
-        file_content_string = ""
-        encodings_to_try = ['utf-8', 'cp874', 'tis-620']
-        for enc in encodings_to_try:
-            try:
-                uploaded_file.seek(0)
-                file_content_string = uploaded_file.getvalue().decode(enc)
-                break
-            except (UnicodeDecodeError, IndexError): continue
-        if not file_content_string: raise ValueError("ไม่สามารถอ่านไฟล์ได้ หรือไฟล์ว่างเปล่า")
-        data_io = io.StringIO(file_content_string)
-
-        if file_type == 'BLE-iMeter':
-            df_raw = pd.read_csv(data_io, sep=',', header=None, low_memory=False)
-            if df_raw.shape[1] < 4: raise ValueError(f"ไฟล์ BLE-iMeter CSV มี {df_raw.shape[1]} คอลัมน์ ไม่เพียงพอ")
-            df = pd.DataFrame({
-                'DateTime': pd.to_datetime(df_raw.iloc[:, 1], errors='coerce'),
-                'Total import kW demand': pd.to_numeric(df_raw.iloc[:, 3], errors='coerce') / 1000.0
-            })
-            st.info("ℹ️ หน่วย Demand ในไฟล์ BLE-iMeter เป็น Watt (W), แปลงเป็น kW โดยการหาร 1000")
-        
-        elif file_type == 'IPG':
-            df_raw = pd.read_csv(data_io, sep='\t', header=0, skipinitialspace=True, low_memory=False)
-            df_raw.columns = df_raw.columns.str.strip()
-            if not all(col in df_raw.columns for col in ['DateTime', 'Total import kW demand']):
-                raise ValueError("ไฟล์ IPG ต้องมีคอลัมน์: 'DateTime' และ 'Total import kW demand'")
-            def correct_buddhist_year(dt_str):
+        # --- ตรวจจับ Encoding สำหรับไฟล์ Text ---
+        if file_type in ['BLE-iMeter', 'IPG']:
+            file_content_string = ""
+            encodings_to_try = ['utf-8', 'cp874', 'tis-620']
+            for enc in encodings_to_try:
                 try:
-                    parts = dt_str.split(' '); date_part = parts[0]; date_components = date_part.split('/')
-                    if len(date_components) == 3:
-                        day, month, year_be = map(int, date_components)
-                        year_ce = datetime.now().year if year_be < 1000 else year_be - 543
-                        return datetime(year_ce, month, day).strftime('%Y-%m-%d') + ' ' + parts[1]
-                except Exception: return None
-                return dt_str
-            df_raw['DateTime_Corrected'] = df_raw['DateTime'].apply(correct_buddhist_year)
-            df = pd.DataFrame({
-                'DateTime': pd.to_datetime(df_raw['DateTime_Corrected'], errors='coerce'),
-                'Total import kW demand': pd.to_numeric(df_raw['Total import kW demand'], errors='coerce')
-            })
-            st.info("ℹ️ หน่วย Demand ในไฟล์ IPG เป็น Kilowatt (kW)")
+                    uploaded_file.seek(0)
+                    file_content_string = uploaded_file.getvalue().decode(enc)
+                    break
+                except (UnicodeDecodeError, IndexError): continue
+            if not file_content_string: raise ValueError("ไม่สามารถอ่านไฟล์ได้ หรือไฟล์ว่างเปล่า")
+            data_io = io.StringIO(file_content_string)
 
+            if file_type == 'BLE-iMeter':
+                df_raw = pd.read_csv(data_io, sep=',', header=None, low_memory=False)
+                if df_raw.shape[1] < 4: raise ValueError(f"ไฟล์ BLE-iMeter CSV มี {df_raw.shape[1]} คอลัมน์ ไม่เพียงพอ")
+                df = pd.DataFrame({
+                    'DateTime': pd.to_datetime(df_raw.iloc[:, 1], errors='coerce'),
+                    'Total import kW demand': pd.to_numeric(df_raw.iloc[:, 3], errors='coerce') / 1000.0
+                })
+                st.info("ℹ️ หน่วย Demand ในไฟล์ BLE-iMeter เป็น Watt (W), แปลงเป็น kW โดยการหาร 1000")
+            
+            elif file_type == 'IPG':
+                df_raw = pd.read_csv(data_io, sep='\t', header=0, skipinitialspace=True, low_memory=False)
+                df_raw.columns = df_raw.columns.str.strip()
+                if not all(col in df_raw.columns for col in ['DateTime', 'Total import kW demand']):
+                    raise ValueError("ไฟล์ IPG ต้องมีคอลัมน์: 'DateTime' และ 'Total import kW demand'")
+                def correct_buddhist_year(dt_str):
+                    try:
+                        parts = dt_str.split(' '); date_part = parts[0]; date_components = date_part.split('/')
+                        if len(date_components) == 3:
+                            day, month, year_be = map(int, date_components)
+                            year_ce = datetime.now().year if year_be < 1000 else year_be - 543
+                            return datetime(year_ce, month, day).strftime('%Y-%m-%d') + ' ' + parts[1]
+                    except Exception: return None
+                    return dt_str
+                df_raw['DateTime_Corrected'] = df_raw['DateTime'].apply(correct_buddhist_year)
+                df = pd.DataFrame({
+                    'DateTime': pd.to_datetime(df_raw['DateTime_Corrected'], errors='coerce'),
+                    'Total import kW demand': pd.to_numeric(df_raw['Total import kW demand'], errors='coerce')
+                })
+                st.info("ℹ️ หน่วย Demand ในไฟล์ IPG เป็น Kilowatt (kW)")
+
+        # --- ประมวลผลไฟล์ CSV โดยตรง ---
         elif file_type == 'มิเตอร์ PEA (CSV)':
-            df_raw = pd.read_csv(data_io, sep=',', header=0, low_memory=False)
+            uploaded_file.seek(0)
+            df_raw = pd.read_csv(uploaded_file, header=0, low_memory=False)
             required_cols = ['DateTime', 'Total import kW demand']
             if not all(col in df_raw.columns for col in required_cols):
                 raise ValueError(f"ไฟล์ CSV ต้องมีคอลัมน์ชื่อ '{required_cols[0]}' และ '{required_cols[1]}'")
@@ -178,12 +182,12 @@ for key in ['full_dataframe', 'last_uploaded_filename', 'calculation_result', 'e
     if key not in st.session_state: st.session_state[key] = None
 
 st.header("1. เลือกประเภทและอัปโหลดไฟล์ข้อมูล")
-selected_file_type_label = st.radio("เลือกประเภทไฟล์ข้อมูล:", ("BLE-iMeter (.txt)", "IPG (.txt)", "มิเตอร์ PEA (.csv)"), horizontal=True, key="data_file_type_label")
+selected_file_type_label = st.radio("เลือกประเภทไฟล์ข้อมูล:", ("BLE-iMeter (.txt)", "IPG (.txt)", "มิเตอร์ PEA (CSV)"), horizontal=True, key="data_file_type_label")
 
 file_type_mapping = {
     "BLE-iMeter (.txt)": "BLE-iMeter",
     "IPG (.txt)": "IPG",
-    "มิเตอร์ PEA (.csv)": "มิเตอร์ (CSV)"
+    "มิเตอร์ PEA (CSV)": "มิเตอร์ (CSV)"
 }
 internal_file_type = file_type_mapping[selected_file_type_label]
 
