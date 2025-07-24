@@ -309,4 +309,22 @@ if st.session_state.calculation_result:
                 output.append(f"          (ช่วงวันที่ชาร์จ: {ev_start_date_str} - {ev_end_date_str})")
             
             output.extend(["-"*40, f"ยอดใช้ไฟรวม: {bill['total_kwh']:,.2f} kWh"])
-            if is_ev_calculated:
+            if is_ev_calculated: 
+                output.extend([f"  - หน่วยไฟบ้าน: {base_kwh:,.2f} kWh", f"  - หน่วยไฟ EV: {ev_kwh:,.2f} kWh"])
+            if st.session_state.tariff_type == 'อัตรา TOU': 
+                output.extend([f"  - Peak: {bill['kwh_peak']:,.2f} kWh", f"  - Off-Peak: {bill['kwh_off_peak']:,.2f} kWh"])
+            output.extend(["-"*40, f"{'ค่าพลังงานไฟฟ้า':<25}: {bill['base_energy_cost']:>12,.2f} บาท", f"{'ค่าบริการรายเดือน':<25}: {bill['service_charge']:>12,.2f} บาท", f"{f'ค่า Ft (@{bill['applicable_ft_rate']:.4f})':<25}: {bill['ft_cost']:>12,.2f} บาท", "-"*40, f"{'ยอดรวมก่อน VAT':<25}: {bill['total_before_vat']:>12,.2f} บาท", f"{f'ภาษีมูลค่าเพิ่ม ({VAT_RATE*100:.0f}%)':<25}: {bill['vat_amount']:>12,.2f} บาท", "="*40])
+            if is_ev_calculated: 
+                output.extend([f"{'ค่าไฟบ้าน (ไม่รวม EV)':<25}: {bill['final_bill'] - ev_cost:>12,.2f} บาท", f"{'ค่าไฟส่วน EV':<25}: {ev_cost:>12,.2f} บาท", "="*40])
+            output.append(f"{'**ยอดค่าไฟฟ้าสุทธิ**':<25}: {bill['final_bill']:>12,.2f} บาท")
+            details_text = "\n".join(output)
+            st.code(details_text, language=None)
+            st.download_button("📥 ดาวน์โหลดผลลัพธ์ (.txt)", details_text.encode('utf-8'), f"bill_result_{datetime.now().strftime('%Y%m%d_%H%M')}.txt", 'text/plain')
+        
+        st.subheader("กราฟ Load Profile (kW Demand)")
+        df_plot = st.session_state.get('df_for_plotting');
+        if df_plot is not None and not df_plot.empty:
+            st.line_chart(df_plot.set_index('DateTime')['Total import kW demand'])
+            st.caption("กราฟแสดงการใช้พลังงาน (kW) สำหรับช่วงวันที่ที่เลือก (รวมผลจากการจำลอง EV หากเปิดใช้งาน)")
+        else: 
+            st.warning("ไม่มีข้อมูลสำหรับสร้างกราฟ")
