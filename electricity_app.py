@@ -120,11 +120,11 @@ def parse_data_file(uploaded_file, file_type):
         elif file_type == 'มิเตอร์ PEA (CSV)':
             uploaded_file.seek(0)
             df_raw = pd.read_csv(uploaded_file, header=0, low_memory=False)
-            required_cols = ['DateTime','Time', 'Total import kW demand']
+            required_cols = ['Time','Total import kW demand']
             if not all(col in df_raw.columns for col in required_cols):
                 raise ValueError(f"ไฟล์ CSV ต้องมีคอลัมน์ชื่อ '{required_cols[0]}' และ '{required_cols[1]}'")
             df = pd.DataFrame({
-                'DateTime': pd.to_datetime(df_raw['DateTime', 'Time'], dayfirst=True, errors='coerce'),
+                'DateTime': pd.to_datetime(df_raw['Time'], dayfirst=True, errors='coerce'),
                 'Total import kW demand': pd.to_numeric(df_raw['Total import kW demand'], errors='coerce')
             })
             st.info("ℹ️ สันนิษฐานว่าหน่วย Demand ในไฟล์ CSV เป็น Kilowatt (kW)")
