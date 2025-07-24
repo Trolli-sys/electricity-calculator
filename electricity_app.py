@@ -99,7 +99,7 @@ def parse_data_file(uploaded_file, file_type):
             df['Total import kW demand'] = pd.to_numeric(df['Total import kW demand'], errors='coerce')
             st.info("ℹ️ หน่วย Demand ในไฟล์ IPG เป็น Kilowatt (kW)")
 
-        elif file_type == 'มิเตอร์ (CSV)':
+        elif file_type == 'มิเตอร์ PEA (CSV)':
             df = pd.read_csv(data_io, sep=',', header=0, low_memory=False)
             required_cols = ['DateTime', 'Total import kW demand']
             if not all(col in df.columns for col in required_cols):
@@ -167,17 +167,28 @@ for key in ['full_dataframe', 'last_uploaded_filename', 'calculation_result', 'e
     if key not in st.session_state: st.session_state[key] = None
 
 st.header("1. เลือกประเภทและอัปโหลดไฟล์ข้อมูล")
-selected_file_type = st.radio("เลือกประเภทไฟล์ข้อมูล:", ("BLE-iMeter", "IPG", "มิเตอร์ (CSV)"), horizontal=True, key="data_file_type")
+selected_file_type = st.radio("เลือกประเภทไฟล์ข้อมูล:", ("BLE-iMeter (.txt)", "IPG (.txt)", "มิเตอร์ PEA (.csv)"), horizontal=True, key="data_file_type")
 
-file_extension = 'txt' if selected_file_type != 'มิเตอร์ (CSV)' else 'csv'
+# แยกชื่อที่แสดงผลกับ key ที่ใช้ภายใน
+file_type_mapping = {
+    "BLE-iMeter (.txt)": "BLE-iMeter",
+    "IPG (.txt)": "IPG",
+    "มิเตอร์ PEA (.csv)": "มิเตอร์ (CSV)"
+}
+internal_file_type = file_type_mapping[selected_file_type]
+
+file_extension = 'csv' if internal_file_type == 'มิเตอร์ (CSV)' else 'txt'
+if internal_file_type == 'มิเตอร์ (CSV)':
+    st.info("💡 สำหรับไฟล์ Excel (.xlsx) กรุณาเปิดไฟล์แล้ว 'บันทึกเป็น' (Save As) ไฟล์ CSV ก่อนอัปโหลด")
+    
 uploaded_file = st.file_uploader(f"เลือกไฟล์ (.{file_extension})", type=[file_extension], key="file_uploader")
 
-if uploaded_file and (uploaded_file.name != st.session_state.get('last_uploaded_filename') or selected_file_type != st.session_state.get('last_file_type')):
+if uploaded_file and (uploaded_file.name != st.session_state.get('last_uploaded_filename') or internal_file_type != st.session_state.get('last_file_type')):
     with st.spinner('กำลังประมวลผลไฟล์...'):
         try:
-            st.session_state.full_dataframe = parse_data_file(uploaded_file, selected_file_type)
+            st.session_state.full_dataframe = parse_data_file(uploaded_file, internal_file_type)
             st.session_state.last_uploaded_filename = uploaded_file.name
-            st.session_state.last_file_type = selected_file_type
+            st.session_state.last_file_type = internal_file_type
             st.success(f"ประมวลผลไฟล์ '{uploaded_file.name}' สำเร็จ")
         except ValueError as ve:
             st.error(f"ข้อผิดพลาด: {ve}"); st.session_state.full_dataframe = None
