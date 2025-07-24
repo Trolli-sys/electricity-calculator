@@ -65,7 +65,7 @@ def parse_data_file(uploaded_file, file_type):
 
     try:
         # --- ตรวจจับ Encoding สำหรับไฟล์ Text ---
-        if file_type in ['BLE-iMeter', 'IPG']:
+        if file_type in ['BLE-iMeter', 'IPG', 'มิเตอร์ PEA (CSV)']:
             file_content_string = ""
             encodings_to_try = ['utf-8', 'cp874', 'tis-620']
             for enc in encodings_to_try:
@@ -107,18 +107,16 @@ def parse_data_file(uploaded_file, file_type):
                 })
                 st.info("ℹ️ หน่วย Demand ในไฟล์ IPG เป็น Kilowatt (kW)")
 
-        # --- ประมวลผลไฟล์ CSV โดยตรง ---
-        elif file_type == 'มิเตอร์ PEA (CSV)':
-            uploaded_file.seek(0)
-            df_raw = pd.read_csv(uploaded_file, header=0, low_memory=False)
-            required_cols = ['DateTime', 'Total import kW demand']
-            if not all(col in df_raw.columns for col in required_cols):
-                raise ValueError(f"ไฟล์ CSV ต้องมีคอลัมน์ชื่อ '{required_cols[0]}' และ '{required_cols[1]}'")
-            df = pd.DataFrame({
-                'DateTime': pd.to_datetime(df_raw['DateTime'], dayfirst=True, errors='coerce'),
-                'Total import kW demand': pd.to_numeric(df_raw['Total import kW demand'], errors='coerce')
-            })
-            st.info("ℹ️ สันนิษฐานว่าหน่วย Demand ในไฟล์ CSV เป็น Kilowatt (kW)")
+            elif file_type == 'มิเตอร์ PEA (CSV)':
+                df_raw = pd.read_csv(data_io, sep=',', header=0, low_memory=False)
+                required_cols = ['DateTime', 'Total import kW demand']
+                if not all(col in df_raw.columns for col in required_cols):
+                    raise ValueError(f"ไฟล์ CSV ต้องมีคอลัมน์ชื่อ '{required_cols[0]}' และ '{required_cols[1]}'")
+                df = pd.DataFrame({
+                    'DateTime': pd.to_datetime(df_raw['DateTime'], dayfirst=True, errors='coerce'),
+                    'Total import kW demand': pd.to_numeric(df_raw['Total import kW demand'], errors='coerce')
+                })
+                st.info("ℹ️ สันนิษฐานว่าหน่วย Demand ในไฟล์ CSV เป็น Kilowatt (kW)")
 
         if df is None:
             raise ValueError(f"ประเภทไฟล์ '{file_type}' ไม่รองรับหรือไม่สามารถประมวลผลได้")
@@ -131,7 +129,6 @@ def parse_data_file(uploaded_file, file_type):
         raise ValueError(f"เกิดข้อผิดพลาดขณะประมวลผลข้อมูล: {e}")
 
 def calculate_bill(df_processed, customer_type_key, tariff_type_key):
-    # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
     if df_processed is None or df_processed.empty: return {"error": "ไม่มีข้อมูลสำหรับคำนวณ"}
     total_kwh = df_processed['kWh'].sum(); data_period_end_dt = df_processed['DateTime'].iloc[-1]; kwh_peak, kwh_off_peak = 0.0, 0.0
     if tariff_type_key == 'tou':
@@ -150,10 +147,17 @@ def calculate_bill(df_processed, customer_type_key, tariff_type_key):
     elif rate_structure['type'] == 'tou': base_energy_cost = (kwh_peak * rate_structure['peak_rate']) + (kwh_off_peak * rate_structure['off_peak_rate'])
     service_charge = rate_structure['service_charge']; applicable_ft_rate = get_ft_rate(data_period_end_dt); ft_cost = total_kwh * applicable_ft_rate
     total_before_vat = base_energy_cost + service_charge + ft_cost; vat_amount = total_before_vat * VAT_RATE; final_bill = total_before_vat + vat_amount
-    return {"total_kwh": total_kwh, "final_bill": final_bill, "base_energy_cost": base_energy_cost, "service_charge": service_charge, "ft_cost": ft_cost, "total_before_vat": total_before_vat, "vat_amount": vat_amount, "applicable_ft_rate": applicable_ft_rate, "kwh_peak": kwh_peak if tariff_type_key == 'tou' else None, "kwh_off_peak": kwh_off_peak if tariff_type_key == 'tou' else None, "data_period_start": df_processed['DateTime'].iloc[0].strftime('%Y-%m-%d %H:%M'), "data_period_end": data_period_end_dt.strftime('%Y-%m-%d %H:%M'), "error": None}
+    return {
+        "total_kwh": total_kwh, "final_bill": final_bill, "base_energy_cost": base_energy_cost,
+        "service_charge": service_charge, "ft_cost": ft_cost, "total_before_vat": total_before_vat,
+        "vat_amount": vat_amount, "applicable_ft_rate": applicable_ft_rate,
+        "kwh_peak": kwh_peak if tariff_type_key == 'tou' else None,
+        "kwh_off_peak": kwh_off_peak if tariff_type_key == 'tou' else None,
+        "data_period_start": df_processed['DateTime'].iloc[0].strftime('%Y-%m-%d %H:%M'),
+        "data_period_end": data_period_end_dt.strftime('%Y-%m-%d %H:%M'), "error": None
+    }
 
 def get_ft_rate(date_in_period):
-    # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
     d = date_in_period.date() if isinstance(date_in_period, datetime) else date_in_period
     sorted_ft_periods = sorted(FT_RATES.keys(), reverse=True)
     for start_year, start_month in sorted_ft_periods:
@@ -161,7 +165,6 @@ def get_ft_rate(date_in_period):
     st.warning(f"ไม่พบอัตรา Ft สำหรับ {d}, ใช้ค่า Ft=0.0"); return 0.0
 
 def classify_tou_period(dt_obj):
-    # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
     if not isinstance(dt_obj, datetime): return 'Unknown'
     current_date = dt_obj.date(); current_time = dt_obj.time()
     year_holidays = HOLIDAYS_TOU_DATA.get(current_date.year)
