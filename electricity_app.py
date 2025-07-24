@@ -10,7 +10,7 @@ import traceback
 # --- ค่าคงที่และข้อมูลอัตรา (CONFIGURATIONS) ---
 # ==============================================================================
 
-# 1. อัตราค่าไฟฟ้า (Tariffs)
+# 1. อัตราค่าไฟฟ้า (Tariffs) - ปรับปรุงตามบิลจริงและประเภทกิจการ
 TARIFFS = {
     "residential": {
         "normal": {'service_charge': 24.62, 'type': 'tiered', 'tiers': [{'limit': 150, 'rate': 3.2484}, {'limit': 400, 'rate': 4.2218}, {'limit': float('inf'), 'rate': 4.4217}]},
@@ -59,9 +59,7 @@ VAT_RATE = 0.07; PEAK_START = time(9, 0, 0); PEAK_END = time(21, 59, 59)
 # ==============================================================================
 @st.cache_data(show_spinner=False)
 def parse_data_file(uploaded_file, file_type):
-    if uploaded_file is None:
-        return None
-    
+    if uploaded_file is None: return None
     df_final = None
     try:
         if file_type in ['BLE-iMeter', 'IPG']:
@@ -72,8 +70,7 @@ def parse_data_file(uploaded_file, file_type):
                     uploaded_file.seek(0)
                     file_content_string = uploaded_file.getvalue().decode(enc)
                     break
-                except (UnicodeDecodeError, IndexError):
-                    continue
+                except (UnicodeDecodeError, IndexError): continue
             if not file_content_string: raise ValueError("ไม่สามารถอ่านไฟล์ได้ หรือไฟล์ว่างเปล่า")
             data_io = io.StringIO(file_content_string)
 
@@ -104,16 +101,10 @@ def parse_data_file(uploaded_file, file_type):
                 st.info("ℹ️ หน่วย Demand ในไฟล์ IPG เป็น Kilowatt (kW)")
 
         elif file_type == 'Excel':
-            # หมายเหตุ: หากไฟล์ Excel ของคุณมีชื่อคอลัมน์ต่างไป ให้แก้ไขที่นี่
-            datetime_col_name = 'DateTime'
-            demand_col_name = 'Total import kW demand'
-            
-            # ใช้ openpyxl engine สำหรับ .xlsx
+            datetime_col_name = 'DateTime'; demand_col_name = 'Total import kW demand'
             df = pd.read_excel(uploaded_file, engine='openpyxl')
-
             if datetime_col_name not in df.columns or demand_col_name not in df.columns:
                 raise ValueError(f"ไฟล์ Excel ต้องมีคอลัมน์ชื่อ '{datetime_col_name}' และ '{demand_col_name}'")
-
             df['DateTime'] = pd.to_datetime(df[datetime_col_name], errors='coerce')
             df['Total import kW demand'] = pd.to_numeric(df[demand_col_name], errors='coerce')
             st.info("ℹ️ สันนิษฐานว่าหน่วย Demand ในไฟล์ Excel เป็น Kilowatt (kW)")
@@ -126,7 +117,6 @@ def parse_data_file(uploaded_file, file_type):
         raise ValueError(f"เกิดข้อผิดพลาดขณะประมวลผลข้อมูล: {e}")
 
 def calculate_bill(df_processed, customer_type_key, tariff_type_key):
-    # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
     if df_processed is None or df_processed.empty: return {"error": "ไม่มีข้อมูลสำหรับคำนวณ"}
     total_kwh = df_processed['kWh'].sum(); data_period_end_dt = df_processed['DateTime'].iloc[-1]; kwh_peak, kwh_off_peak = 0.0, 0.0
     if tariff_type_key == 'tou':
@@ -148,7 +138,6 @@ def calculate_bill(df_processed, customer_type_key, tariff_type_key):
     return {"total_kwh": total_kwh, "final_bill": final_bill, "base_energy_cost": base_energy_cost, "service_charge": service_charge, "ft_cost": ft_cost, "total_before_vat": total_before_vat, "vat_amount": vat_amount, "applicable_ft_rate": applicable_ft_rate, "kwh_peak": kwh_peak if tariff_type_key == 'tou' else None, "kwh_off_peak": kwh_off_peak if tariff_type_key == 'tou' else None, "data_period_start": df_processed['DateTime'].iloc[0].strftime('%Y-%m-%d %H:%M'), "data_period_end": data_period_end_dt.strftime('%Y-%m-%d %H:%M'), "error": None}
 
 def get_ft_rate(date_in_period):
-    # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
     d = date_in_period.date() if isinstance(date_in_period, datetime) else date_in_period
     sorted_ft_periods = sorted(FT_RATES.keys(), reverse=True)
     for start_year, start_month in sorted_ft_periods:
@@ -156,7 +145,6 @@ def get_ft_rate(date_in_period):
     st.warning(f"ไม่พบอัตรา Ft สำหรับ {d}, ใช้ค่า Ft=0.0"); return 0.0
 
 def classify_tou_period(dt_obj):
-    # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
     if not isinstance(dt_obj, datetime): return 'Unknown'
     current_date = dt_obj.date(); current_time = dt_obj.time()
     year_holidays = HOLIDAYS_TOU_DATA.get(current_date.year)
@@ -177,14 +165,10 @@ for key in ['full_dataframe', 'last_uploaded_filename', 'calculation_result', 'e
     if key not in st.session_state: st.session_state[key] = None
 
 st.header("1. เลือกประเภทและอัปโหลดไฟล์ข้อมูล")
-selected_file_type = st.radio(
-    "เลือกประเภทไฟล์ข้อมูล (Load Profile):",
-    ("BLE-iMeter", "IPG", "Excel"),
-    horizontal=True, key="data_file_type"
-)
+selected_file_type = st.radio("เลือกประเภทไฟล์ข้อมูล:", ("BLE-iMeter", "IPG", "Excel"), horizontal=True, key="data_file_type")
 
-file_types = ['txt'] if selected_file_type != 'Excel' else ['xlsx']
-uploaded_file = st.file_uploader(f"เลือกไฟล์ ({', '.join(file_types)})", type=file_types, key="file_uploader")
+file_extension = 'txt' if selected_file_type != 'Excel' else 'xlsx'
+uploaded_file = st.file_uploader(f"เลือกไฟล์ (.{file_extension})", type=[file_extension], key="file_uploader")
 
 if uploaded_file and (uploaded_file.name != st.session_state.get('last_uploaded_filename') or selected_file_type != st.session_state.get('last_file_type')):
     with st.spinner('กำลังประมวลผลไฟล์...'):
@@ -198,8 +182,7 @@ if uploaded_file and (uploaded_file.name != st.session_state.get('last_uploaded_
 
 if st.session_state.get('full_dataframe') is not None:
     st.divider(); st.header("2. ตั้งค่าการคำนวณ")
-    df_full = st.session_state.full_dataframe
-    min_date = df_full['DateTime'].min().date(); max_date = df_full['DateTime'].max().date()
+    df_full = st.session_state.full_dataframe; min_date = df_full['DateTime'].min().date(); max_date = df_full['DateTime'].max().date()
     
     col1, col2 = st.columns([1, 2])
     with col1:
@@ -264,7 +247,6 @@ if st.session_state.get('full_dataframe') is not None:
                 except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}"); st.error(traceback.format_exc())
 
 if st.session_state.calculation_result:
-    # ... (โค้ดส่วนแสดงผลไม่เปลี่ยนแปลง)
     st.divider(); st.header("3. ผลการคำนวณ")
     bill = st.session_state.calculation_result; ev_cost = st.session_state.ev_cost; base_kwh = st.session_state.base_kwh; ev_kwh = st.session_state.ev_kwh
     if bill.get("error"): st.error(f"เกิดข้อผิดพลาด: {bill['error']}")
@@ -303,4 +285,12 @@ if st.session_state.calculation_result:
             if is_ev_calculated: output.extend([f"{'ค่าไฟบ้าน (ไม่รวม EV)':<25}: {bill['final_bill'] - ev_cost:>12,.2f} บาท", f"{'ค่าไฟส่วน EV':<25}: {ev_cost:>12,.2f} บาท", "="*40])
             output.append(f"{'**ยอดค่าไฟฟ้าสุทธิ**':<25}: {bill['final_bill']:>12,.2f} บาท")
             details_text = "\n".join(output)
-            st.code(
+            st.code(details_text, language=None)
+            st.download_button("📥 ดาวน์โหลดผลลัพธ์ (.txt)", details_text.encode('utf-8'), f"bill_result_{datetime.now().strftime('%Y%m%d_%H%M')}.txt", 'text/plain')
+        
+        st.subheader("กราฟ Load Profile (kW Demand)")
+        df_plot = st.session_state.get('df_for_plotting');
+        if df_plot is not None and not df_plot.empty:
+            st.line_chart(df_plot.set_index('DateTime')['Total import kW demand'])
+            st.caption("กราฟแสดงการใช้พลังงาน (kW) สำหรับช่วงวันที่ที่เลือก (รวมผลจากการจำลอง EV หากเปิดใช้งาน)")
+        else: st.warning("ไม่มีข้อมูลสำหรับสร้างกราฟ")
