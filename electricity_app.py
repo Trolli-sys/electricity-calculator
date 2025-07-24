@@ -59,79 +59,68 @@ VAT_RATE = 0.07; PEAK_START = time(9, 0, 0); PEAK_END = time(21, 59, 59)
 # ==============================================================================
 @st.cache_data(show_spinner=False)
 def parse_data_file(uploaded_file, file_type):
-    """อ่านและประมวลผลไฟล์ข้อมูล Load Profile ตามประเภทที่เลือก"""
     if uploaded_file is None:
         return None
-        
-    # --- ตรวจจับ Encoding ---
-    file_content_string = ""
-    encodings_to_try = ['utf-8', 'cp874', 'tis-620']
-    for enc in encodings_to_try:
-        try:
-            uploaded_file.seek(0)
-            file_content_string = uploaded_file.getvalue().decode(enc)
-            break
-        except (UnicodeDecodeError, IndexError):
-            continue
-    if not file_content_string:
-        raise ValueError("ไม่สามารถอ่านไฟล์ได้ หรือไฟล์ว่างเปล่า")
-
-    data_io = io.StringIO(file_content_string)
-    df_final = None
     
+    df_final = None
     try:
-        # --- ประมวลผลตามประเภทไฟล์ ---
-        if file_type == 'BLE-iMeter':
-            # CSV format: PRECISE...,YYYY-MM-DD HH:MM:SS,...,Demand(W),...
-            df = pd.read_csv(data_io, sep=',', header=None, low_memory=False)
-            if df.shape[1] < 4:
-                raise ValueError(f"ไฟล์ BLE-iMeter CSV มี {df.shape[1]} คอลัมน์ ไม่เพียงพอสำหรับข้อมูลที่ต้องการ")
-            
-            df['DateTime'] = pd.to_datetime(df.iloc[:, 1], errors='coerce')
-            # Demand อยู่ในหน่วย Watt ต้องหาร 1000
-            df['Total import kW demand'] = pd.to_numeric(df.iloc[:, 3], errors='coerce') / 1000.0
-            
-            df_final = df.dropna(subset=['DateTime', 'Total import kW demand'])[['DateTime', 'Total import kW demand']].copy()
-            st.info("ℹ️ หน่วย Demand ในไฟล์ BLE-iMeter เป็น Watt (W), แปลงเป็น kW โดยการหาร 1000")
-
-        elif file_type == 'IPG':
-            # Tab-separated format: DateTime\tTotal import kW demand
-            df = pd.read_csv(data_io, sep='\t', header=0, skipinitialspace=True, low_memory=False)
-            df.columns = df.columns.str.strip()
-            if not all(col in df.columns for col in ['DateTime', 'Total import kW demand']):
-                raise ValueError("ไฟล์ IPG ต้องมีคอลัมน์: 'DateTime' และ 'Total import kW demand'")
-
-            # ตรวจสอบและแก้ไขปี พ.ศ. ที่ผิดพลาด
-            def correct_buddhist_year(dt_str):
+        if file_type in ['BLE-iMeter', 'IPG']:
+            file_content_string = ""
+            encodings_to_try = ['utf-8', 'cp874', 'tis-620']
+            for enc in encodings_to_try:
                 try:
-                    parts = dt_str.split(' ')
-                    date_part = parts[0]
-                    date_components = date_part.split('/')
-                    if len(date_components) == 3:
-                        day, month, year_be = map(int, date_components)
-                        if year_be < 1000: # สันนิษฐานว่าเป็นปี พ.ศ. ที่ผิดพลาด
-                            current_ce_year = datetime.now().year
-                            year_ce = current_ce_year
-                        else:
-                            year_ce = year_be - 543
-                        # สร้างวันที่ใหม่
-                        return datetime(year_ce, month, day).strftime('%Y-%m-%d') + ' ' + parts[1]
-                except Exception:
-                    return None
-                return dt_str
+                    uploaded_file.seek(0)
+                    file_content_string = uploaded_file.getvalue().decode(enc)
+                    break
+                except (UnicodeDecodeError, IndexError):
+                    continue
+            if not file_content_string: raise ValueError("ไม่สามารถอ่านไฟล์ได้ หรือไฟล์ว่างเปล่า")
+            data_io = io.StringIO(file_content_string)
 
-            df['DateTime_Corrected'] = df['DateTime'].apply(correct_buddhist_year)
-            df['DateTime'] = pd.to_datetime(df['DateTime_Corrected'], errors='coerce')
-            df['Total import kW demand'] = pd.to_numeric(df['Total import kW demand'], errors='coerce')
+            if file_type == 'BLE-iMeter':
+                df = pd.read_csv(data_io, sep=',', header=None, low_memory=False)
+                if df.shape[1] < 4: raise ValueError(f"ไฟล์ BLE-iMeter CSV มี {df.shape[1]} คอลัมน์ ไม่เพียงพอ")
+                df['DateTime'] = pd.to_datetime(df.iloc[:, 1], errors='coerce')
+                df['Total import kW demand'] = pd.to_numeric(df.iloc[:, 3], errors='coerce') / 1000.0
+                st.info("ℹ️ หน่วย Demand ในไฟล์ BLE-iMeter เป็น Watt (W), แปลงเป็น kW โดยการหาร 1000")
             
-            df_final = df.dropna(subset=['DateTime', 'Total import kW demand'])[['DateTime', 'Total import kW demand']].copy()
-            st.info("ℹ️ หน่วย Demand ในไฟล์ IPG เป็น Kilowatt (kW)")
+            elif file_type == 'IPG':
+                df = pd.read_csv(data_io, sep='\t', header=0, skipinitialspace=True, low_memory=False)
+                df.columns = df.columns.str.strip()
+                if not all(col in df.columns for col in ['DateTime', 'Total import kW demand']):
+                    raise ValueError("ไฟล์ IPG ต้องมีคอลัมน์: 'DateTime' และ 'Total import kW demand'")
+                def correct_buddhist_year(dt_str):
+                    try:
+                        parts = dt_str.split(' '); date_part = parts[0]; date_components = date_part.split('/')
+                        if len(date_components) == 3:
+                            day, month, year_be = map(int, date_components)
+                            year_ce = datetime.now().year if year_be < 1000 else year_be - 543
+                            return datetime(year_ce, month, day).strftime('%Y-%m-%d') + ' ' + parts[1]
+                    except Exception: return None
+                    return dt_str
+                df['DateTime_Corrected'] = df['DateTime'].apply(correct_buddhist_year)
+                df['DateTime'] = pd.to_datetime(df['DateTime_Corrected'], errors='coerce')
+                df['Total import kW demand'] = pd.to_numeric(df['Total import kW demand'], errors='coerce')
+                st.info("ℹ️ หน่วย Demand ในไฟล์ IPG เป็น Kilowatt (kW)")
 
-        if df_final is None or df_final.empty:
-            raise ValueError("ไม่พบข้อมูลที่ถูกต้องในไฟล์หลังการประมวลผล")
+        elif file_type == 'Excel':
+            # หมายเหตุ: หากไฟล์ Excel ของคุณมีชื่อคอลัมน์ต่างไป ให้แก้ไขที่นี่
+            datetime_col_name = 'DateTime'
+            demand_col_name = 'Total import kW demand'
+            
+            # ใช้ openpyxl engine สำหรับ .xlsx
+            df = pd.read_excel(uploaded_file, engine='openpyxl')
 
-        df_final = df_final.sort_values(by='DateTime').reset_index(drop=True)
-        return df_final
+            if datetime_col_name not in df.columns or demand_col_name not in df.columns:
+                raise ValueError(f"ไฟล์ Excel ต้องมีคอลัมน์ชื่อ '{datetime_col_name}' และ '{demand_col_name}'")
+
+            df['DateTime'] = pd.to_datetime(df[datetime_col_name], errors='coerce')
+            df['Total import kW demand'] = pd.to_numeric(df[demand_col_name], errors='coerce')
+            st.info("ℹ️ สันนิษฐานว่าหน่วย Demand ในไฟล์ Excel เป็น Kilowatt (kW)")
+
+        df_final = df.dropna(subset=['DateTime', 'Total import kW demand'])[['DateTime', 'Total import kW demand']].copy()
+        if df_final.empty: raise ValueError("ไม่พบข้อมูลที่ถูกต้องในไฟล์หลังการประมวลผล")
+        return df_final.sort_values(by='DateTime').reset_index(drop=True)
 
     except Exception as e:
         raise ValueError(f"เกิดข้อผิดพลาดขณะประมวลผลข้อมูล: {e}")
@@ -183,22 +172,19 @@ def classify_tou_period(dt_obj):
 # ==============================================================================
 st.set_page_config(page_title="คำนวณค่าไฟฟ้า", layout="wide")
 st.title("📊 โปรแกรมคำนวณและจำลองค่าไฟฟ้า")
-st.markdown("อัปโหลดไฟล์ Load Profile เพื่อคำนวณค่าไฟตาม **ช่วงวันที่** ที่ต้องการ และจำลองการใช้งาน EV Charger")
 
-for key in ['full_dataframe', 'last_uploaded_filename', 'calculation_result', 'ev_cost', 'base_kwh', 'ev_kwh', 'data_file_type']:
+for key in ['full_dataframe', 'last_uploaded_filename', 'calculation_result', 'ev_cost', 'base_kwh', 'ev_kwh']:
     if key not in st.session_state: st.session_state[key] = None
 
-# --- 1. ส่วนเลือกประเภทและอัปโหลดไฟล์ ---
 st.header("1. เลือกประเภทและอัปโหลดไฟล์ข้อมูล")
 selected_file_type = st.radio(
     "เลือกประเภทไฟล์ข้อมูล (Load Profile):",
-    ("BLE-iMeter", "IPG"),
-    horizontal=True,
-    key="data_file_type",
-    help="BLE-iMeter: ไฟล์ .txt จากมิเตอร์ PRECISE | IPG: ไฟล์ .txt ที่มีคอลัมน์ DateTime และ Total import kW demand"
+    ("BLE-iMeter", "IPG", "Excel"),
+    horizontal=True, key="data_file_type"
 )
 
-uploaded_file = st.file_uploader("เลือกไฟล์ (.txt)", type=['txt'], key="file_uploader")
+file_types = ['txt'] if selected_file_type != 'Excel' else ['xlsx']
+uploaded_file = st.file_uploader(f"เลือกไฟล์ ({', '.join(file_types)})", type=file_types, key="file_uploader")
 
 if uploaded_file and (uploaded_file.name != st.session_state.get('last_uploaded_filename') or selected_file_type != st.session_state.get('last_file_type')):
     with st.spinner('กำลังประมวลผลไฟล์...'):
@@ -208,34 +194,26 @@ if uploaded_file and (uploaded_file.name != st.session_state.get('last_uploaded_
             st.session_state.last_file_type = selected_file_type
             st.success(f"ประมวลผลไฟล์ '{uploaded_file.name}' สำเร็จ")
         except ValueError as ve:
-            st.error(f"ข้อผิดพลาด: {ve}")
-            st.session_state.full_dataframe = None
+            st.error(f"ข้อผิดพลาด: {ve}"); st.session_state.full_dataframe = None
 
-# --- 2. ส่วนตั้งค่าการคำนวณ ---
 if st.session_state.get('full_dataframe') is not None:
     st.divider(); st.header("2. ตั้งค่าการคำนวณ")
     df_full = st.session_state.full_dataframe
-    min_date = df_full['DateTime'].min().date()
-    max_date = df_full['DateTime'].max().date()
-
-    customer_options = {"บ้านอยู่อาศัย": "residential", "กิจการขนาดเล็ก": "smb"}
+    min_date = df_full['DateTime'].min().date(); max_date = df_full['DateTime'].max().date()
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        customer_label = st.selectbox("ประเภทผู้ใช้:", customer_options.keys(), key="customer_type_label")
-        customer_key = customer_options[customer_label]
-
-        if customer_key == "smb":
+        customer_label = st.selectbox("ประเภทผู้ใช้:", ["บ้านอยู่อาศัย", "กิจการขนาดเล็ก"], key="customer_type_label")
+        customer_key = "residential"
+        if customer_label == "กิจการขนาดเล็ก":
             voltage_label = st.radio("ระดับแรงดันไฟฟ้า:", ("แรงดันต่ำกว่า 22 kV", "แรงดัน 22-33 kV"), key="voltage_level", horizontal=True)
             customer_key = "smb_lv" if voltage_label == "แรงดันต่ำกว่า 22 kV" else "smb_mv"
-        
         tariff_type = st.selectbox("ประเภทอัตรา:", ["อัตราปกติ", "อัตรา TOU"], key="tariff_type")
         
     with col2:
         main_date_range = st.date_input("เลือกช่วงวันที่สำหรับคำนวณ", value=(min_date, max_date), min_value=min_date, max_value=max_date, key="main_date_range")
 
     with st.expander("🔌 จำลอง EV Charger (ตัวเลือกเพิ่มเติม)"):
-        # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
         ev_enabled = st.checkbox("เปิดใช้งานการจำลอง EV", key="ev_enabled")
         if len(main_date_range) == 2:
             ev_start_range, ev_end_range = main_date_range
@@ -285,9 +263,8 @@ if st.session_state.get('full_dataframe') is not None:
                         st.session_state.calculation_result = total_bill_details
                 except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}"); st.error(traceback.format_exc())
 
-# --- 3. ส่วนแสดงผลลัพธ์ ---
 if st.session_state.calculation_result:
-    # ... (โค้ดส่วนนี้ไม่เปลี่ยนแปลง)
+    # ... (โค้ดส่วนแสดงผลไม่เปลี่ยนแปลง)
     st.divider(); st.header("3. ผลการคำนวณ")
     bill = st.session_state.calculation_result; ev_cost = st.session_state.ev_cost; base_kwh = st.session_state.base_kwh; ev_kwh = st.session_state.ev_kwh
     if bill.get("error"): st.error(f"เกิดข้อผิดพลาด: {bill['error']}")
@@ -326,12 +303,4 @@ if st.session_state.calculation_result:
             if is_ev_calculated: output.extend([f"{'ค่าไฟบ้าน (ไม่รวม EV)':<25}: {bill['final_bill'] - ev_cost:>12,.2f} บาท", f"{'ค่าไฟส่วน EV':<25}: {ev_cost:>12,.2f} บาท", "="*40])
             output.append(f"{'**ยอดค่าไฟฟ้าสุทธิ**':<25}: {bill['final_bill']:>12,.2f} บาท")
             details_text = "\n".join(output)
-            st.code(details_text, language=None)
-            st.download_button("📥 ดาวน์โหลดผลลัพธ์ (.txt)", details_text.encode('utf-8'), f"bill_result_{datetime.now().strftime('%Y%m%d_%H%M')}.txt", 'text/plain')
-        
-        st.subheader("กราฟ Load Profile (kW Demand)")
-        df_plot = st.session_state.get('df_for_plotting');
-        if df_plot is not None and not df_plot.empty:
-            st.line_chart(df_plot.set_index('DateTime')['Total import kW demand'])
-            st.caption("กราฟแสดงการใช้พลังงาน (kW) สำหรับช่วงวันที่ที่เลือก (รวมผลจากการจำลอง EV หากเปิดใช้งาน)")
-        else: st.warning("ไม่มีข้อมูลสำหรับสร้างกราฟ")
+            st.code(
