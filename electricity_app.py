@@ -13,7 +13,18 @@ import traceback
 # 1. อัตราค่าไฟฟ้า (Tariffs)
 TARIFFS = {
     "residential": {
-        "normal": {'service_charge': 24.62, 'type': 'tiered', 'tiers': [{'limit': 150, 'rate': 3.2484}, {'limit': 400, 'rate': 4.2218}, {'limit': float('inf'), 'rate': 4.4217}]},
+        "normal": {
+            'service_charge_tiers': [
+                {'limit': 150, 'rate': 8.19},
+                {'limit': float('inf'), 'rate': 24.62}
+            ],
+            'type': 'tiered', 
+            'tiers': [
+                {'limit': 150, 'rate': 3.2484}, 
+                {'limit': 400, 'rate': 4.2218}, 
+                {'limit': float('inf'), 'rate': 4.4217}
+            ]
+        },
         "tou": {'service_charge': 24.62, 'type': 'tou', 'peak_rate': 5.7982, 'off_peak_rate': 2.6369}
     },
     "smb_lv": { # กิจการขนาดเล็ก, แรงดันต่ำกว่า 22 kV
@@ -128,6 +139,19 @@ def parse_data_file(uploaded_file, file_type):
     except Exception as e:
         raise ValueError(f"เกิดข้อผิดพลาดขณะประมวลผลข้อมูล: {e}")
 
+def calculate_service_charge(total_kwh, rate_structure):
+    """คำนวณค่าบริการรายเดือนตาม tier ของหน่วยไฟที่ใช้"""
+    if 'service_charge_tiers' in rate_structure:
+        # ใช้ระบบ tier สำหรับ service charge
+        for tier in rate_structure['service_charge_tiers']:
+            if total_kwh <= tier['limit']:
+                return tier['rate']
+        # หากเกินทุก tier ให้ใช้ tier สุดท้าย
+        return rate_structure['service_charge_tiers'][-1]['rate']
+    else:
+        # ใช้ค่าเดิม (fixed rate)
+        return rate_structure['service_charge']
+
 def calculate_bill(df_processed, customer_type_key, tariff_type_key):
     if df_processed is None or df_processed.empty: return {"error": "ไม่มีข้อมูลสำหรับคำนวณ"}
     total_kwh = df_processed['kWh'].sum(); data_period_end_dt = df_processed['DateTime'].iloc[-1]; kwh_peak, kwh_off_peak = 0.0, 0.0
@@ -137,6 +161,7 @@ def calculate_bill(df_processed, customer_type_key, tariff_type_key):
     try:
         rate_structure = TARIFFS[customer_type_key][tariff_type_key]
     except KeyError as e: return {"error": f"ไม่พบโครงสร้างอัตราค่าไฟฟ้าสำหรับ '{customer_type_key}'/'{tariff_type_key}': {e}"}
+    
     base_energy_cost = 0.0
     if rate_structure['type'] == 'flat': base_energy_cost = total_kwh * rate_structure['rate']
     elif rate_structure['type'] == 'tiered':
@@ -145,8 +170,13 @@ def calculate_bill(df_processed, customer_type_key, tariff_type_key):
             units_in_tier = max(0, min(total_kwh, tier['limit']) - last_limit); base_energy_cost += units_in_tier * tier['rate']; last_limit = tier['limit'];
             if total_kwh <= tier['limit']: break
     elif rate_structure['type'] == 'tou': base_energy_cost = (kwh_peak * rate_structure['peak_rate']) + (kwh_off_peak * rate_structure['off_peak_rate'])
-    service_charge = rate_structure['service_charge']; applicable_ft_rate = get_ft_rate(data_period_end_dt); ft_cost = total_kwh * applicable_ft_rate
+    
+    # คำนวณค่าบริการรายเดือนตาม tier ใหม่
+    service_charge = calculate_service_charge(total_kwh, rate_structure)
+    
+    applicable_ft_rate = get_ft_rate(data_period_end_dt); ft_cost = total_kwh * applicable_ft_rate
     total_before_vat = base_energy_cost + service_charge + ft_cost; vat_amount = total_before_vat * VAT_RATE; final_bill = total_before_vat + vat_amount
+    
     return {
         "total_kwh": total_kwh, "final_bill": final_bill, "base_energy_cost": base_energy_cost,
         "service_charge": service_charge, "ft_cost": ft_cost, "total_before_vat": total_before_vat,
@@ -301,30 +331,4 @@ if st.session_state.calculation_result:
             output = [
                 "--- ผลการคำนวณค่าไฟฟ้า ---",
                 f"ช่วงข้อมูล: {bill['data_period_start']} ถึง {bill['data_period_end']}",
-                f"ประเภทผู้ใช้: {display_customer_label}, อัตรา: {st.session_state.tariff_type}",]
-            if is_ev_calculated:
-                ev_start_date_str = st.session_state.ev_date_range[0].strftime('%d/%m/%Y')
-                ev_end_date_str = st.session_state.ev_date_range[1].strftime('%d/%m/%Y')
-                output.append(f"จำลอง EV: {st.session_state.ev_power:.2f} kW ({st.session_state.ev_start_time.strftime('%H:%M')} - {st.session_state.ev_end_time.strftime('%H:%M')})")
-                output.append(f"          (ช่วงวันที่ชาร์จ: {ev_start_date_str} - {ev_end_date_str})")
-            
-            output.extend(["-"*40, f"ยอดใช้ไฟรวม: {bill['total_kwh']:,.2f} kWh"])
-            if is_ev_calculated: 
-                output.extend([f"  - หน่วยไฟบ้าน: {base_kwh:,.2f} kWh", f"  - หน่วยไฟ EV: {ev_kwh:,.2f} kWh"])
-            if st.session_state.tariff_type == 'อัตรา TOU': 
-                output.extend([f"  - Peak: {bill['kwh_peak']:,.2f} kWh", f"  - Off-Peak: {bill['kwh_off_peak']:,.2f} kWh"])
-            output.extend(["-"*40, f"{'ค่าพลังงานไฟฟ้า':<25}: {bill['base_energy_cost']:>12,.2f} บาท", f"{'ค่าบริการรายเดือน':<25}: {bill['service_charge']:>12,.2f} บาท", f"{f'ค่า Ft (@{bill['applicable_ft_rate']:.4f})':<25}: {bill['ft_cost']:>12,.2f} บาท", "-"*40, f"{'ยอดรวมก่อน VAT':<25}: {bill['total_before_vat']:>12,.2f} บาท", f"{f'ภาษีมูลค่าเพิ่ม ({VAT_RATE*100:.0f}%)':<25}: {bill['vat_amount']:>12,.2f} บาท", "="*40])
-            if is_ev_calculated: 
-                output.extend([f"{'ค่าไฟบ้าน (ไม่รวม EV)':<25}: {bill['final_bill'] - ev_cost:>12,.2f} บาท", f"{'ค่าไฟส่วน EV':<25}: {ev_cost:>12,.2f} บาท", "="*40])
-            output.append(f"{'**ยอดค่าไฟฟ้าสุทธิ**':<25}: {bill['final_bill']:>12,.2f} บาท")
-            details_text = "\n".join(output)
-            st.code(details_text, language=None)
-            st.download_button("📥 ดาวน์โหลดผลลัพธ์ (.txt)", details_text.encode('utf-8'), f"bill_result_{datetime.now().strftime('%Y%m%d_%H%M')}.txt", 'text/plain')
-        
-        st.subheader("กราฟ Load Profile (kW Demand)")
-        df_plot = st.session_state.get('df_for_plotting');
-        if df_plot is not None and not df_plot.empty:
-            st.line_chart(df_plot.set_index('DateTime')['Total import kW demand'])
-            st.caption("กราฟแสดงการใช้พลังงาน (kW) สำหรับช่วงวันที่ที่เลือก (รวมผลจากการจำลอง EV หากเปิดใช้งาน)")
-        else: 
-            st.warning("ไม่มีข้อมูลสำหรับสร้างกราฟ")
+                f"ประเภทผู้ใช้: {display_customer_label}, อัตรา: {st.session_state
