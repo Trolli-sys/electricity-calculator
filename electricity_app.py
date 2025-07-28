@@ -41,7 +41,7 @@ TARIFFS = {
 FT_RATES = {
     (2023, 1): 0.9343, (2023, 5): 0.9119, (2023, 9): 0.2048,
     (2024, 1): 0.3972, (2024, 5): 0.3972, (2024, 9): 0.3972,
-    (2025, 1): 0.3672, (2025, 5): 0.1972, (2025, 9): 0.1972,
+    (2025, 1): 0.3972, (2025, 5): 0.1972, (2025, 9): 0.1972,
 }
 
 # 3. วันหยุดสำหรับอัตรา TOU
@@ -120,7 +120,7 @@ def parse_data_file(uploaded_file, file_type):
         elif file_type == 'มิเตอร์ PEA (CSV)':
             uploaded_file.seek(0)
             df_raw = pd.read_csv(uploaded_file, header=0, low_memory=False)
-            required_cols = ['DateTime','Total import kW demand']
+            required_cols = ['DateTime', 'Total import kW demand']
             if not all(col in df_raw.columns for col in required_cols):
                 raise ValueError(f"ไฟล์ CSV ต้องมีคอลัมน์ชื่อ '{required_cols[0]}' และ '{required_cols[1]}'")
             df = pd.DataFrame({
@@ -267,7 +267,15 @@ if st.session_state.get('full_dataframe') is not None:
         ev_end_time = ev_col3.time_input("เวลาสิ้นสุดชาร์จ", time(5, 0), key="ev_end_time", disabled=not ev_enabled)
     st.divider()
 
-    if st.button("คำนวณค่าไฟ", type="primary"):
+    col_calc1, col_calc2 = st.columns(2)
+    with col_calc1:
+        if st.button("คำนวณค่าไฟ", type="primary"):
+            st.session_state.do_calculation = True
+    with col_calc2:
+        if st.button("🔄 เปรียบเทียบอัตราปกติ vs TOU", type="secondary"):
+            st.session_state.do_comparison = True
+
+    if st.session_state.get('do_calculation', False):
         st.session_state.calculation_result = None; st.session_state.ev_cost = None; st.session_state.base_kwh = None; st.session_state.ev_kwh = None
         if len(main_date_range) != 2: st.error("กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
         else:
@@ -304,6 +312,120 @@ if st.session_state.get('full_dataframe') is not None:
                             st.session_state.df_for_plotting = df_with_ev
                         else: st.session_state.df_for_plotting = df_base
                         st.session_state.calculation_result = total_bill_details
+                        st.session_state.do_calculation = False
+                except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}"); st.error(traceback.format_exc())
+
+    if st.session_state.get('do_comparison', False):
+        st.session_state.calculation_result = None; st.session_state.ev_cost = None; st.session_state.base_kwh = None; st.session_state.ev_kwh = None
+        if len(main_date_range) != 2: st.error("กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
+        else:
+            main_start_date, main_end_date = main_date_range
+            with st.spinner("กำลังเปรียบเทียบอัตราค่าไฟ..."):
+                try:
+                    mask = (df_full['DateTime'].dt.date >= main_start_date) & (df_full['DateTime'].dt.date <= main_end_date)
+                    df_filtered = df_full[mask].copy()
+                    if df_filtered.empty: st.warning("ไม่พบข้อมูลในช่วงวันที่ที่เลือก")
+                    else:
+                        interval_hours = (df_filtered['DateTime'].iloc[1] - df_filtered['DateTime'].iloc[0]).total_seconds() / 3600.0 if len(df_filtered) > 1 else 0.25
+                        if not (0 < interval_hours <= 24): interval_hours = 0.25
+                        
+                        # เตรียมข้อมูลพื้นฐาน
+                        df_base = df_filtered.copy(); df_base['kWh'] = df_base['Total import kW demand'] * interval_hours
+                        
+                        # เพิ่ม EV หากเปิดใช้งาน
+                        if ev_enabled:
+                            time_series = df_base['DateTime'].dt.time; date_series = df_base['DateTime'].dt.date
+                            ev_start_date_select, ev_end_date_select = st.session_state.ev_date_range
+                            time_mask = (time_series >= ev_start_time) | (time_series < ev_end_time) if ev_start_time > ev_end_time else (time_series >= ev_start_time) & (time_series < ev_end_time)
+                            date_mask = (date_series >= ev_start_date_select) & (date_series <= ev_end_date_select)
+                            df_base.loc[time_mask & date_mask, 'Total import kW demand'] += ev_power_kw
+                            df_base['kWh'] = df_base['Total import kW demand'] * interval_hours
+                        
+                        # คำนวณทั้งสองอัตรา
+                        normal_bill = calculate_bill(df_base, customer_key, "normal")
+                        tou_bill = calculate_bill(df_base, customer_key, "tou")
+                        
+                        # แสดงผลเปรียบเทียบ
+                        st.divider()
+                        st.header("🔄 เปรียบเทียบอัตราค่าไฟ")
+                        
+                        comp_col1, comp_col2, comp_col3 = st.columns(3)
+                        with comp_col1:
+                            st.subheader("📊 อัตราปกติ")
+                            st.metric("ยอดค่าไฟสุทธิ", f"{normal_bill['final_bill']:,.2f} บาท")
+                            st.metric("หน่วยไฟรวม", f"{normal_bill['total_kwh']:,.2f} kWh")
+                        
+                        with comp_col2:
+                            st.subheader("⏰ อัตรา TOU")
+                            st.metric("ยอดค่าไฟสุทธิ", f"{tou_bill['final_bill']:,.2f} บาท")
+                            st.metric("หน่วยไฟรวม", f"{tou_bill['total_kwh']:,.2f} kWh")
+                            st.metric("Peak", f"{tou_bill['kwh_peak']:,.2f} kWh")
+                            st.metric("Off-Peak", f"{tou_bill['kwh_off_peak']:,.2f} kWh")
+                        
+                        with comp_col3:
+                            difference = tou_bill['final_bill'] - normal_bill['final_bill']
+                            percentage = (difference / normal_bill['final_bill']) * 100 if normal_bill['final_bill'] > 0 else 0
+                            st.subheader("💡 ผลต่าง")
+                            if difference < 0:
+                                st.success(f"TOU ประหยัดกว่า\n{abs(difference):,.2f} บาท")
+                                st.success(f"ประหยัด {abs(percentage):.1f}%")
+                            elif difference > 0:
+                                st.error(f"TOU แพงกว่า\n{difference:,.2f} บาท")
+                                st.error(f"แพงขึ้น {percentage:.1f}%")
+                            else:
+                                st.info("ค่าไฟเท่ากัน")
+                        
+                        # ตารางเปรียบเทียบรายละเอียด
+                        with st.expander("📋 ดูรายละเอียดการเปรียบเทียบ"):
+                            comparison_data = {
+                                "รายการ": [
+                                    "ค่าพลังงานไฟฟ้า (บาท)",
+                                    "ค่าบริการรายเดือน (บาท)", 
+                                    "ค่า Ft (บาท)",
+                                    "รวมก่อน VAT (บาท)",
+                                    "VAT 7% (บาท)",
+                                    "ยอดสุทธิ (บาท)"
+                                ],
+                                "อัตราปกติ": [
+                                    f"{normal_bill['base_energy_cost']:,.2f}",
+                                    f"{normal_bill['service_charge']:,.2f}",
+                                    f"{normal_bill['ft_cost']:,.2f}",
+                                    f"{normal_bill['total_before_vat']:,.2f}",
+                                    f"{normal_bill['vat_amount']:,.2f}",
+                                    f"{normal_bill['final_bill']:,.2f}"
+                                ],
+                                "อัตรา TOU": [
+                                    f"{tou_bill['base_energy_cost']:,.2f}",
+                                    f"{tou_bill['service_charge']:,.2f}",
+                                    f"{tou_bill['ft_cost']:,.2f}",
+                                    f"{tou_bill['total_before_vat']:,.2f}",
+                                    f"{tou_bill['vat_amount']:,.2f}",
+                                    f"{tou_bill['final_bill']:,.2f}"
+                                ],
+                                "ผลต่าง": [
+                                    f"{tou_bill['base_energy_cost'] - normal_bill['base_energy_cost']:+,.2f}",
+                                    f"{tou_bill['service_charge'] - normal_bill['service_charge']:+,.2f}",
+                                    f"{tou_bill['ft_cost'] - normal_bill['ft_cost']:+,.2f}",
+                                    f"{tou_bill['total_before_vat'] - normal_bill['total_before_vat']:+,.2f}",
+                                    f"{tou_bill['vat_amount'] - normal_bill['vat_amount']:+,.2f}",
+                                    f"{tou_bill['final_bill'] - normal_bill['final_bill']:+,.2f}"
+                                ]
+                            }
+                            comparison_df = pd.DataFrame(comparison_data)
+                            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+                            
+                            # คำแนะนำ
+                            st.subheader("💡 คำแนะนำ")
+                            if difference < -50:
+                                st.success("🎯 **แนะนำให้เปลี่ยนเป็นอัตรา TOU** - ประหยัดค่าไฟได้มาก เนื่องจากใช้ไฟใน Off-Peak มากกว่า Peak")
+                            elif difference < 0:
+                                st.info("✅ **อัตรา TOU ประหยัดกว่าเล็กน้อย** - ควรพิจารณาเปลี่ยนหากต้องการประหยัด")
+                            elif difference <= 50:
+                                st.warning("⚖️ **ค่าไฟใกล้เคียงกัน** - เลือกอัตราที่สะดวกต่อการใช้งาน")
+                            else:
+                                st.error("❌ **อัตราปกติประหยัดกว่า** - ไม่แนะนำให้เปลี่ยนเป็น TOU เนื่องจากใช้ไฟใน Peak มาก")
+                        
+                        st.session_state.do_comparison = False
                 except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}"); st.error(traceback.format_exc())
 
 if st.session_state.calculation_result:
