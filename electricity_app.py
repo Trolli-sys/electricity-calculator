@@ -5,9 +5,7 @@ import io
 from datetime import datetime, time, date
 import calendar
 import traceback
-import plotly.express as px
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
+import numpy as np
 
 # ==============================================================================
 # --- Custom CSS Styling ---
@@ -418,54 +416,31 @@ def classify_tou_period(dt_obj):
     if current_date in year_holidays: return 'Off-Peak'
     return 'Peak' if PEAK_START <= current_time <= PEAK_END else 'Off-Peak'
 
-def create_enhanced_chart(df_plot):
-    """สร้างกราฟที่สวยงามด้วย Plotly"""
+def create_enhanced_chart_data(df_plot):
+    """เตรียมข้อมูลสำหรับกราฟ Streamlit"""
     if df_plot is None or df_plot.empty:
         return None
     
-    fig = go.Figure()
+    # เตรียมข้อมูลสำหรับ line chart
+    chart_data = df_plot.set_index('DateTime')['Total import kW demand']
+    return chart_data
+
+def create_daily_consumption_data(df_plot):
+    """สร้างข้อมูลการใช้ไฟรายวัน"""
+    if df_plot is None or df_plot.empty:
+        return None
     
-    # เพิ่มเส้นหลัก
-    fig.add_trace(go.Scatter(
-        x=df_plot['DateTime'],
-        y=df_plot['Total import kW demand'],
-        mode='lines',
-        name='Power Demand',
-        line=dict(color='#667eea', width=2),
-        fill='tonexty',
-        fillcolor='rgba(102, 126, 234, 0.1)'
-    ))
+    daily_data = df_plot.groupby(df_plot['DateTime'].dt.date)['Total import kW demand'].mean()
+    return daily_data
+
+def create_hourly_pattern_data(df_plot):
+    """สร้างข้อมูลรูปแบบการใช้ไฟตามชั่วโมง"""
+    if df_plot is None or df_plot.empty:
+        return None
     
-    # ปรับแต่งหน้าตา
-    fig.update_layout(
-        title=dict(
-            text="📊 Load Profile Analysis",
-            font=dict(size=20, color='#2c3e50', family='Inter'),
-            x=0.5
-        ),
-        xaxis=dict(
-            title="Time",
-            gridcolor='rgba(0,0,0,0.1)',
-            showgrid=True,
-            zeroline=False,
-            tickfont=dict(color='#6c757d')
-        ),
-        yaxis=dict(
-            title="Power Demand (kW)",
-            gridcolor='rgba(0,0,0,0.1)',
-            showgrid=True,
-            zeroline=False,
-            tickfont=dict(color='#6c757d')
-        ),
-        plot_bgcolor='white',
-        paper_bgcolor='white',
-        font=dict(family='Inter', color='#2c3e50'),
-        height=400,
-        margin=dict(l=10, r=10, t=60, b=10),
-        showlegend=False
-    )
-    
-    return fig
+    df_plot['Hour'] = df_plot['DateTime'].dt.hour
+    hourly_data = df_plot.groupby('Hour')['Total import kW demand'].mean()
+    return hourly_data
 
 # ==============================================================================
 # --- Streamlit App ---
@@ -1029,53 +1004,26 @@ if st.session_state.calculation_result:
         
         df_plot = st.session_state.get('df_for_plotting')
         if df_plot is not None and not df_plot.empty:
-            # Create enhanced chart
-            chart_fig = create_enhanced_chart(df_plot)
-            if chart_fig:
-                st.plotly_chart(chart_fig, use_container_width=True)
+            # Main load profile chart
+            st.markdown("### 📊 Load Profile Analysis")
+            chart_data = create_enhanced_chart_data(df_plot)
+            if chart_data is not None:
+                st.line_chart(chart_data, height=400)
             
             # Additional analysis charts
             col_chart1, col_chart2 = st.columns(2)
             
             with col_chart1:
-                # Daily consumption chart
-                daily_consumption = df_plot.groupby(df_plot['DateTime'].dt.date)['Total import kW demand'].mean().reset_index()
-                daily_consumption.columns = ['Date', 'Average_kW']
-                
-                fig_daily = px.bar(
-                    daily_consumption,
-                    x='Date',
-                    y='Average_kW',
-                    title="📊 การใช้ไฟเฉลี่ยรายวัน",
-                    color='Average_kW',
-                    color_continuous_scale='blues'
-                )
-                fig_daily.update_layout(
-                    title_font=dict(size=16, color='#2c3e50'),
-                    height=300,
-                    margin=dict(l=10, r=10, t=40, b=10)
-                )
-                st.plotly_chart(fig_daily, use_container_width=True)
+                st.markdown("### 📊 การใช้ไฟเฉลี่ยรายวัน")
+                daily_data = create_daily_consumption_data(df_plot)
+                if daily_data is not None:
+                    st.bar_chart(daily_data, height=300)
             
             with col_chart2:
-                # Hourly pattern chart
-                df_plot['Hour'] = df_plot['DateTime'].dt.hour
-                hourly_pattern = df_plot.groupby('Hour')['Total import kW demand'].mean().reset_index()
-                
-                fig_hourly = px.line(
-                    hourly_pattern,
-                    x='Hour',
-                    y='Total import kW demand',
-                    title="⏰ รูปแบบการใช้ไฟตามชั่วโมง",
-                    markers=True
-                )
-                fig_hourly.update_traces(line_color='#667eea', line_width=3)
-                fig_hourly.update_layout(
-                    title_font=dict(size=16, color='#2c3e50'),
-                    height=300,
-                    margin=dict(l=10, r=10, t=40, b=10)
-                )
-                st.plotly_chart(fig_hourly, use_container_width=True)
+                st.markdown("### ⏰ รูปแบบการใช้ไฟตามชั่วโมง")
+                hourly_data = create_hourly_pattern_data(df_plot)
+                if hourly_data is not None:
+                    st.line_chart(hourly_data, height=300)
             
             # TOU Analysis (if applicable)
             if st.session_state.tariff_type == '⏰ อัตรา TOU':
@@ -1083,32 +1031,28 @@ if st.session_state.calculation_result:
                 
                 # Add TOU classification
                 df_plot['TOU_Period'] = df_plot['DateTime'].apply(classify_tou_period)
-                tou_summary = df_plot.groupby('TOU_Period')['Total import kW demand'].agg(['mean', 'sum', 'count']).reset_index()
+                tou_summary = df_plot.groupby('TOU_Period')['Total import kW demand'].agg(['mean', 'sum', 'count'])
                 
                 col_tou1, col_tou2 = st.columns(2)
                 
                 with col_tou1:
-                    fig_tou_pie = px.pie(
-                        tou_summary,
-                        values='sum',
-                        names='TOU_Period',
-                        title="🥧 สัดส่วนการใช้ไฟ Peak vs Off-Peak",
-                        color_discrete_map={'Peak': '#ff6b6b', 'Off-Peak': '#4ecdc4'}
-                    )
-                    fig_tou_pie.update_layout(height=300)
-                    st.plotly_chart(fig_tou_pie, use_container_width=True)
+                    st.markdown("#### 🥧 สัดส่วนการใช้ไฟ Peak vs Off-Peak")
+                    # Create pie chart data for Streamlit
+                    tou_pie_data = tou_summary['sum']
+                    
+                    # Display as metrics instead of pie chart
+                    total_consumption = tou_pie_data.sum()
+                    for period, consumption in tou_pie_data.items():
+                        percentage = (consumption / total_consumption) * 100
+                        if period == 'Peak':
+                            st.error(f"🔥 {period}: {consumption:.2f} kWh ({percentage:.1f}%)")
+                        else:
+                            st.success(f"🌙 {period}: {consumption:.2f} kWh ({percentage:.1f}%)")
                 
                 with col_tou2:
-                    fig_tou_bar = px.bar(
-                        tou_summary,
-                        x='TOU_Period',
-                        y='mean',
-                        title="📊 ค่าเฉลี่ย Peak vs Off-Peak",
-                        color='TOU_Period',
-                        color_discrete_map={'Peak': '#ff6b6b', 'Off-Peak': '#4ecdc4'}
-                    )
-                    fig_tou_bar.update_layout(height=300, showlegend=False)
-                    st.plotly_chart(fig_tou_bar, use_container_width=True)
+                    st.markdown("#### 📊 ค่าเฉลี่ย Peak vs Off-Peak")
+                    tou_avg_data = tou_summary['mean']
+                    st.bar_chart(tou_avg_data, height=300)
             
             # Summary Statistics
             with st.expander("📊 สถิติการใช้ไฟ", expanded=False):
