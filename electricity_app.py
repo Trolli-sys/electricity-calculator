@@ -6,6 +6,8 @@ from datetime import datetime, time, date
 import calendar
 import traceback
 import numpy as np
+from datetime import datetime, time, date
+import base64
 
 # ==============================================================================
 # --- Custom CSS Styling ---
@@ -441,6 +443,427 @@ def create_hourly_pattern_data(df_plot):
     df_plot['Hour'] = df_plot['DateTime'].dt.hour
     hourly_data = df_plot.groupby('Hour')['Total import kW demand'].mean()
     return hourly_data
+
+def generate_print_report(bill_data, ev_data, df_plot, settings):
+    """สร้างรายงานสำหรับพิมพ์ในรูปแบบ HTML"""
+    
+    # คำนวณสถิติเพิ่มเติม
+    if df_plot is not None and not df_plot.empty:
+        stats = {
+            'max_demand': df_plot['Total import kW demand'].max(),
+            'min_demand': df_plot['Total import kW demand'].min(),
+            'avg_demand': df_plot['Total import kW demand'].mean(),
+            'median_demand': df_plot['Total import kW demand'].median(),
+            'std_demand': df_plot['Total import kW demand'].std(),
+            'load_factor': (df_plot['Total import kW demand'].mean() / df_plot['Total import kW demand'].max()) * 100,
+            'total_records': len(df_plot)
+        }
+    else:
+        stats = {}
+    
+    # สร้าง HTML รายงาน
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>รายงานการคำนวณค่าไฟฟ้า</title>
+        <style>
+            @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap');
+            
+            body {{
+                font-family: 'Sarabun', sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: white;
+                color: #2c3e50;
+                line-height: 1.6;
+            }}
+            
+            .report-header {{
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 30px;
+                border-radius: 15px;
+                text-align: center;
+                margin-bottom: 30px;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            }}
+            
+            .report-header h1 {{
+                margin: 0;
+                font-size: 2.5rem;
+                font-weight: 700;
+            }}
+            
+            .report-header p {{
+                margin: 10px 0 0 0;
+                font-size: 1.2rem;
+                opacity: 0.9;
+            }}
+            
+            .section {{
+                background: white;
+                border-radius: 12px;
+                padding: 25px;
+                margin-bottom: 25px;
+                box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+                border: 1px solid rgba(0,0,0,0.05);
+                page-break-inside: avoid;
+            }}
+            
+            .section-title {{
+                color: #667eea;
+                font-size: 1.5rem;
+                font-weight: 600;
+                margin-bottom: 20px;
+                padding-bottom: 10px;
+                border-bottom: 2px solid #f0f2f6;
+            }}
+            
+            .info-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+                gap: 15px;
+                margin-bottom: 20px;
+            }}
+            
+            .info-item {{
+                background: #f8f9ff;
+                padding: 15px;
+                border-radius: 8px;
+                border-left: 4px solid #667eea;
+            }}
+            
+            .info-label {{
+                font-weight: 600;
+                color: #2c3e50;
+                margin-bottom: 5px;
+            }}
+            
+            .info-value {{
+                font-size: 1.1rem;
+                color: #667eea;
+                font-weight: 500;
+            }}
+            
+            .metric-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 20px;
+                margin: 20px 0;
+            }}
+            
+            .metric-card {{
+                background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+                border-radius: 12px;
+                padding: 20px;
+                text-align: center;
+                border-left: 4px solid #667eea;
+                box-shadow: 0 3px 15px rgba(0,0,0,0.05);
+            }}
+            
+            .metric-value {{
+                font-size: 2rem;
+                font-weight: 700;
+                color: #2c3e50;
+                margin-bottom: 5px;
+            }}
+            
+            .metric-label {{
+                color: #6c757d;
+                font-weight: 500;
+            }}
+            
+            .calculation-table {{
+                width: 100%;
+                border-collapse: collapse;
+                margin: 20px 0;
+                background: white;
+                border-radius: 8px;
+                overflow: hidden;
+                box-shadow: 0 3px 15px rgba(0,0,0,0.05);
+            }}
+            
+            .calculation-table th {{
+                background: #667eea;
+                color: white;
+                padding: 15px;
+                text-align: left;
+                font-weight: 600;
+            }}
+            
+            .calculation-table td {{
+                padding: 12px 15px;
+                border-bottom: 1px solid #f0f2f6;
+            }}
+            
+            .calculation-table tr:nth-child(even) {{
+                background: #f8f9ff;
+            }}
+            
+            .total-row {{
+                background: #667eea !important;
+                color: white !important;
+                font-weight: 700;
+            }}
+            
+            .total-row td {{
+                border-bottom: none !important;
+            }}
+            
+            .stats-grid {{
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+                gap: 15px;
+                margin: 20px 0;
+            }}
+            
+            .stat-item {{
+                background: #f8f9ff;
+                padding: 15px;
+                border-radius: 8px;
+                text-align: center;
+                border: 1px solid #e3f2fd;
+            }}
+            
+            .stat-value {{
+                font-size: 1.3rem;
+                font-weight: 600;
+                color: #667eea;
+                margin-bottom: 5px;
+            }}
+            
+            .stat-label {{
+                font-size: 0.9rem;
+                color: #6c757d;
+            }}
+            
+            .recommendations {{
+                background: linear-gradient(135deg, #e8f5e8 0%, #ffffff 100%);
+                border-left: 4px solid #4caf50;
+                padding: 20px;
+                border-radius: 8px;
+                margin: 20px 0;
+            }}
+            
+            .recommendations h4 {{
+                color: #2e7d32;
+                margin-top: 0;
+            }}
+            
+            .recommendations ul {{
+                margin: 0;
+                padding-left: 20px;
+            }}
+            
+            .recommendations li {{
+                margin-bottom: 8px;
+                color: #2c3e50;
+            }}
+            
+            .footer {{
+                text-align: center;
+                margin-top: 40px;
+                padding: 20px;
+                background: #f8f9ff;
+                border-radius: 12px;
+                color: #6c757d;
+            }}
+            
+            @media print {{
+                body {{ margin: 0; padding: 15px; font-size: 12pt; }}
+                .report-header {{ margin-bottom: 20px; }}
+                .section {{ margin-bottom: 15px; page-break-inside: avoid; }}
+                .metric-grid {{ grid-template-columns: repeat(2, 1fr); }}
+                .info-grid {{ grid-template-columns: 1fr; }}
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="report-header">
+            <h1>⚡ รายงานการคำนวณค่าไฟฟ้า</h1>
+            <p>Electric Bill Calculation Report</p>
+            <p>สร้างเมื่อ: {datetime.now().strftime('%d/%m/%Y %H:%M น.')}</p>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">📋 ข้อมูลทั่วไป</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <div class="info-label">ช่วงข้อมูล</div>
+                    <div class="info-value">{bill_data['data_period_start']} ถึง {bill_data['data_period_end']}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">ประเภทผู้ใช้</div>
+                    <div class="info-value">{settings['customer_type']}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">ประเภทอัตรา</div>
+                    <div class="info-value">{settings['tariff_type']}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">อัตรา Ft</div>
+                    <div class="info-value">{bill_data['applicable_ft_rate']:.4f} บาท/kWh</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="section">
+            <h2 class="section-title">💰 สรุปค่าไฟฟ้า</h2>
+            <div class="metric-grid">
+                <div class="metric-card">
+                    <div class="metric-value">{bill_data['final_bill']:,.2f}</div>
+                    <div class="metric-label">ยอดค่าไฟสุทธิ (บาท)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{bill_data['total_kwh']:,.2f}</div>
+                    <div class="metric-label">ยอดใช้ไฟรวม (kWh)</div>
+                </div>"""
+    
+    # เพิ่มข้อมูล EV หากมี
+    if ev_data['is_enabled']:
+        html_content += f"""
+                <div class="metric-card">
+                    <div class="metric-value">{ev_data['cost']:,.2f}</div>
+                    <div class="metric-label">ค่าไฟส่วน EV (บาท)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{ev_data['kwh']:,.2f}</div>
+                    <div class="metric-label">หน่วยไฟ EV (kWh)</div>
+                </div>"""
+    
+    html_content += """
+            </div>
+            
+            <table class="calculation-table">
+                <thead>
+                    <tr>
+                        <th>รายการ</th>
+                        <th style="text-align: right;">จำนวน (บาท)</th>
+                    </tr>
+                </thead>
+                <tbody>"""
+    
+    # เพิ่มรายการคำนวณ
+    calculation_items = [
+        ("ค่าพลังงานไฟฟ้า", bill_data['base_energy_cost']),
+        ("ค่าบริการรายเดือน", bill_data['service_charge']),
+        (f"ค่า Ft (@{bill_data['applicable_ft_rate']:.4f})", bill_data['ft_cost']),
+        ("รวมก่อน VAT", bill_data['total_before_vat']),
+        ("ภาษีมูลค่าเพิ่ม (7%)", bill_data['vat_amount'])
+    ]
+    
+    for item, value in calculation_items:
+        html_content += f"""
+                    <tr>
+                        <td>{item}</td>
+                        <td style="text-align: right;">{value:,.2f}</td>
+                    </tr>"""
+    
+    html_content += f"""
+                    <tr class="total-row">
+                        <td><strong>ยอดค่าไฟฟ้าสุทธิ</strong></td>
+                        <td style="text-align: right;"><strong>{bill_data['final_bill']:,.2f}</strong></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>"""
+    
+    # เพิ่มข้อมูล TOU หากใช้
+    if bill_data.get('kwh_peak') is not None:
+        html_content += f"""
+        <div class="section">
+            <h2 class="section-title">⏰ วิเคราะห์ Peak/Off-Peak</h2>
+            <div class="metric-grid">
+                <div class="metric-card">
+                    <div class="metric-value">{bill_data['kwh_peak']:,.2f}</div>
+                    <div class="metric-label">Peak Period (kWh)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{bill_data['kwh_off_peak']:,.2f}</div>
+                    <div class="metric-label">Off-Peak Period (kWh)</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{(bill_data['kwh_peak']/(bill_data['kwh_peak']+bill_data['kwh_off_peak'])*100):,.1f}%</div>
+                    <div class="metric-label">สัดส่วน Peak</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">{(bill_data['kwh_off_peak']/(bill_data['kwh_peak']+bill_data['kwh_off_peak'])*100):,.1f}%</div>
+                    <div class="metric-label">สัดส่วน Off-Peak</div>
+                </div>
+            </div>
+        </div>"""
+    
+    # เพิ่มสถิติการใช้ไฟ
+    if stats:
+        html_content += f"""
+        <div class="section">
+            <h2 class="section-title">📊 สถิติการใช้ไฟ</h2>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-value">{stats['max_demand']:,.2f}</div>
+                    <div class="stat-label">ค่าสูงสุด (kW)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{stats['min_demand']:,.2f}</div>
+                    <div class="stat-label">ค่าต่ำสุด (kW)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{stats['avg_demand']:,.2f}</div>
+                    <div class="stat-label">ค่าเฉลี่ย (kW)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{stats['median_demand']:,.2f}</div>
+                    <div class="stat-label">ค่ามัธยฐาน (kW)</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{stats['std_demand']:,.2f}</div>
+                    <div class="stat-label">ส่วนเบียงเบนมาตรฐาน</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">{stats['load_factor']:,.1f}%</div>
+                    <div class="stat-label">Load Factor</div>
+                </div>
+            </div>
+        </div>"""
+    
+    # เพิ่มคำแนะนำ
+    html_content += """
+        <div class="section">
+            <h2 class="section-title">💡 คำแนะนำประหยัดพลังงาน</h2>
+            
+            <div class="recommendations">
+                <h4>🏠 สำหรับบ้านอยู่อาศัย</h4>
+                <ul>
+                    <li>🌡️ ตั้งเครื่องปรับอากาศที่ 25-26°C เพื่อประหยัดได้ 6-8%</li>
+                    <li>💡 เปลี่ยนเป็นหลอด LED ประหยัดได้ถึง 80%</li>
+                    <li>🔌 ถอดปลั๊กเครื่องใช้ไฟฟ้าที่ไม่ได้ใช้งาน</li>
+                    <li>⏰ ใช้ไฟในช่วง Off-Peak (22:00-09:00 น.)</li>
+                </ul>
+            </div>
+            
+            <div class="recommendations">
+                <h4>🚗 สำหรับ EV Charging</h4>
+                <ul>
+                    <li>🌙 ชาร์จในช่วงกลางคืน (22:00-05:00) เพื่อประหยัดสุด</li>
+                    <li>📱 ใช้ระบบ Smart Charging เพื่อจัดการการชาร์จอัตโนมัติ</li>
+                    <li>🔋 ชาร์จแบตเตอรี่ในช่วง 20-80% เพื่อยืดอายุการใช้งาน</li>
+                    <li>☀️ พิจารณาติดตั้งโซลาร์เซลล์ร่วมกับ EV</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p><strong>⚡ Electric Bill Calculator Pro</strong></p>
+            <p>เครื่องมือคำนวณค่าไฟฟ้าระดับมืออาชีพ | สร้างด้วย ❤️</p>
+            <p>รายงานนี้สร้างขึ้นเพื่อการวิเคราะห์และวางแผนการใช้พลังงานเท่านั้น</p>
+        </div>
+    </body>
+    </html>
+    """
+    
+    return html_content
 
 # ==============================================================================
 # --- Streamlit App ---
