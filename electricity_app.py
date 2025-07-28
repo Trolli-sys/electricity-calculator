@@ -5,6 +5,224 @@ import io
 from datetime import datetime, time, date
 import calendar
 import traceback
+import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+
+# ==============================================================================
+# --- Custom CSS Styling ---
+# ==============================================================================
+def load_custom_css():
+    st.markdown("""
+    <style>
+    /* Import Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    
+    /* Global Styles */
+    .main {
+        font-family: 'Inter', sans-serif;
+    }
+    
+    /* Header Styling */
+    .main-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem;
+        border-radius: 15px;
+        margin-bottom: 2rem;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+    }
+    
+    .main-header h1 {
+        color: white;
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin: 0;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+    
+    .main-header p {
+        color: rgba(255,255,255,0.9);
+        font-size: 1.2rem;
+        margin: 0.5rem 0 0 0;
+        font-weight: 300;
+    }
+    
+    /* Section Cards */
+    .section-card {
+        background: white;
+        border-radius: 15px;
+        padding: 2rem;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+        border: 1px solid rgba(0,0,0,0.05);
+        margin-bottom: 2rem;
+    }
+    
+    .section-header {
+        display: flex;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #f0f2f6;
+    }
+    
+    .section-header h2 {
+        color: #2c3e50;
+        font-size: 1.8rem;
+        font-weight: 600;
+        margin: 0;
+        margin-left: 0.5rem;
+    }
+    
+    .section-icon {
+        font-size: 2rem;
+        color: #667eea;
+    }
+    
+    /* Metric Cards */
+    .metric-card {
+        background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border-left: 4px solid #667eea;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.05);
+        margin-bottom: 1rem;
+    }
+    
+    .metric-value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: #2c3e50;
+        line-height: 1;
+    }
+    
+    .metric-label {
+        font-size: 0.9rem;
+        color: #6c757d;
+        font-weight: 500;
+        margin-top: 0.5rem;
+    }
+    
+    /* Comparison Cards */
+    .comparison-card {
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.05);
+    }
+    
+    .comparison-normal {
+        background: linear-gradient(135deg, #e3f2fd 0%, #ffffff 100%);
+        border-left: 4px solid #2196f3;
+    }
+    
+    .comparison-tou {
+        background: linear-gradient(135deg, #f3e5f5 0%, #ffffff 100%);
+        border-left: 4px solid #9c27b0;
+    }
+    
+    .comparison-diff {
+        background: linear-gradient(135deg, #e8f5e8 0%, #ffffff 100%);
+        border-left: 4px solid #4caf50;
+    }
+    
+    .comparison-diff.negative {
+        background: linear-gradient(135deg, #ffebee 0%, #ffffff 100%);
+        border-left: 4px solid #f44336;
+    }
+    
+    /* File Upload Area */
+    .upload-area {
+        border: 2px dashed #667eea;
+        border-radius: 12px;
+        padding: 2rem;
+        text-align: center;
+        background: linear-gradient(135deg, #f8f9ff 0%, #ffffff 100%);
+        margin: 1rem 0;
+    }
+    
+    /* Status Badges */
+    .status-badge {
+        display: inline-block;
+        padding: 0.4rem 1rem;
+        border-radius: 20px;
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin: 0.2rem;
+    }
+    
+    .status-success {
+        background: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .status-warning {
+        background: #fff3cd;
+        color: #856404;
+        border: 1px solid #ffeaa7;
+    }
+    
+    .status-info {
+        background: #d1ecf1;
+        color: #0c5460;
+        border: 1px solid #bee5eb;
+    }
+    
+    /* Buttons */
+    .stButton > button {
+        border-radius: 10px;
+        border: none;
+        padding: 0.75rem 2rem;
+        font-weight: 600;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    }
+    
+    /* Charts */
+    .chart-container {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 3px 15px rgba(0,0,0,0.05);
+        border: 1px solid rgba(0,0,0,0.05);
+    }
+    
+    /* Sidebar */
+    .css-1d391kg {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    /* Hide Streamlit branding */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 8px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: #667eea;
+        border-radius: 10px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: #5a6fd8;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
 # ==============================================================================
 # --- ค่าคงที่และข้อมูลอัตรา (CONFIGURATIONS) ---
@@ -94,7 +312,7 @@ def parse_data_file(uploaded_file, file_type):
                     'DateTime': pd.to_datetime(df_raw.iloc[:, 1], errors='coerce'),
                     'Total import kW demand': pd.to_numeric(df_raw.iloc[:, 3], errors='coerce') / 1000.0
                 })
-                st.info("ℹ️ หน่วย Demand ในไฟล์ BLE-iMeter เป็น Watt (W), แปลงเป็น kW โดยการหาร 1000")
+                st.success("✅ หน่วย Demand ในไฟล์ BLE-iMeter เป็น Watt (W), แปลงเป็น kW โดยการหาร 1000")
             
             elif file_type == 'IPG':
                 df_raw = pd.read_csv(data_io, sep='\t', header=0, skipinitialspace=True, low_memory=False)
@@ -115,7 +333,7 @@ def parse_data_file(uploaded_file, file_type):
                     'DateTime': pd.to_datetime(df_raw['DateTime_Corrected'], errors='coerce'),
                     'Total import kW demand': pd.to_numeric(df_raw['Total import kW demand'], errors='coerce')
                 })
-                st.info("ℹ️ หน่วย Demand ในไฟล์ IPG เป็น Kilowatt (kW)")
+                st.success("✅ หน่วย Demand ในไฟล์ IPG เป็น Kilowatt (kW)")
 
         elif file_type == 'มิเตอร์ PEA (CSV)':
             uploaded_file.seek(0)
@@ -127,7 +345,7 @@ def parse_data_file(uploaded_file, file_type):
                 'DateTime': pd.to_datetime(df_raw['DateTime'], dayfirst=True, errors='coerce'),
                 'Total import kW demand': pd.to_numeric(df_raw['Total import kW demand'], errors='coerce')
             })
-            st.info("ℹ️ สันนิษฐานว่าหน่วย Demand ในไฟล์ CSV เป็น Kilowatt (kW)")
+            st.success("✅ สันนิษฐานว่าหน่วย Demand ในไฟล์ CSV เป็น Kilowatt (kW)")
 
         if df is None:
             raise ValueError(f"ประเภทไฟล์ '{file_type}' ไม่รองรับหรือไม่สามารถประมวลผลได้")
@@ -142,14 +360,11 @@ def parse_data_file(uploaded_file, file_type):
 def calculate_service_charge(total_kwh, rate_structure):
     """คำนวณค่าบริการรายเดือนตาม tier ของหน่วยไฟที่ใช้"""
     if 'service_charge_tiers' in rate_structure:
-        # ใช้ระบบ tier สำหรับ service charge
         for tier in rate_structure['service_charge_tiers']:
             if total_kwh <= tier['limit']:
                 return tier['rate']
-        # หากเกินทุก tier ให้ใช้ tier สุดท้าย
         return rate_structure['service_charge_tiers'][-1]['rate']
     else:
-        # ใช้ค่าเดิม (fixed rate)
         return rate_structure['service_charge']
 
 def calculate_bill(df_processed, customer_type_key, tariff_type_key):
@@ -171,9 +386,7 @@ def calculate_bill(df_processed, customer_type_key, tariff_type_key):
             if total_kwh <= tier['limit']: break
     elif rate_structure['type'] == 'tou': base_energy_cost = (kwh_peak * rate_structure['peak_rate']) + (kwh_off_peak * rate_structure['off_peak_rate'])
     
-    # คำนวณค่าบริการรายเดือนตาม tier ใหม่
     service_charge = calculate_service_charge(total_kwh, rate_structure)
-    
     applicable_ft_rate = get_ft_rate(data_period_end_dt); ft_cost = total_kwh * applicable_ft_rate
     total_before_vat = base_energy_cost + service_charge + ft_cost; vat_amount = total_before_vat * VAT_RATE; final_bill = total_before_vat + vat_amount
     
@@ -205,92 +418,294 @@ def classify_tou_period(dt_obj):
     if current_date in year_holidays: return 'Off-Peak'
     return 'Peak' if PEAK_START <= current_time <= PEAK_END else 'Off-Peak'
 
+def create_enhanced_chart(df_plot):
+    """สร้างกราฟที่สวยงามด้วย Plotly"""
+    if df_plot is None or df_plot.empty:
+        return None
+    
+    fig = go.Figure()
+    
+    # เพิ่มเส้นหลัก
+    fig.add_trace(go.Scatter(
+        x=df_plot['DateTime'],
+        y=df_plot['Total import kW demand'],
+        mode='lines',
+        name='Power Demand',
+        line=dict(color='#667eea', width=2),
+        fill='tonexty',
+        fillcolor='rgba(102, 126, 234, 0.1)'
+    ))
+    
+    # ปรับแต่งหน้าตา
+    fig.update_layout(
+        title=dict(
+            text="📊 Load Profile Analysis",
+            font=dict(size=20, color='#2c3e50', family='Inter'),
+            x=0.5
+        ),
+        xaxis=dict(
+            title="Time",
+            gridcolor='rgba(0,0,0,0.1)',
+            showgrid=True,
+            zeroline=False,
+            tickfont=dict(color='#6c757d')
+        ),
+        yaxis=dict(
+            title="Power Demand (kW)",
+            gridcolor='rgba(0,0,0,0.1)',
+            showgrid=True,
+            zeroline=False,
+            tickfont=dict(color='#6c757d')
+        ),
+        plot_bgcolor='white',
+        paper_bgcolor='white',
+        font=dict(family='Inter', color='#2c3e50'),
+        height=400,
+        margin=dict(l=10, r=10, t=60, b=10),
+        showlegend=False
+    )
+    
+    return fig
+
 # ==============================================================================
 # --- Streamlit App ---
 # ==============================================================================
-st.set_page_config(page_title="คำนวณค่าไฟฟ้า", layout="wide")
-st.title("📊 โปรแกรมคำนวณและจำลองค่าไฟฟ้า")
+st.set_page_config(
+    page_title="Electric Bill Calculator Pro", 
+    layout="wide",
+    initial_sidebar_state="expanded",
+    page_icon="⚡"
+)
 
+# Load custom CSS
+load_custom_css()
+
+# Initialize session state
 for key in ['full_dataframe', 'last_uploaded_filename', 'calculation_result', 'ev_cost', 'base_kwh', 'ev_kwh']:
     if key not in st.session_state: st.session_state[key] = None
 
-st.header("1. เลือกประเภทและอัปโหลดไฟล์ข้อมูล")
-selected_file_type_label = st.radio("เลือกประเภทไฟล์ข้อมูล:", ("BLE-iMeter (.txt)", "IPG (.txt)", "มิเตอร์ PEA (CSV)"), horizontal=True, key="data_file_type_label")
+# Header
+st.markdown("""
+<div class="main-header">
+    <h1>⚡ Electric Bill Calculator Pro</h1>
+    <p>โปรแกรมคำนวณและจำลองค่าไฟฟ้าระดับมืออาชีพ</p>
+</div>
+""", unsafe_allow_html=True)
+
+# Sidebar
+with st.sidebar:
+    st.markdown("### 🔧 เครื่องมือและข้อมูล")
+    
+    # Quick Stats
+    if st.session_state.get('full_dataframe') is not None:
+        df_info = st.session_state.full_dataframe
+        st.markdown("### 📈 ข้อมูลไฟล์")
+        st.metric("จำนวนข้อมูล", f"{len(df_info):,} รายการ")
+        st.metric("ช่วงเวลา", f"{(df_info['DateTime'].max() - df_info['DateTime'].min()).days} วัน")
+        st.metric("Demand เฉลี่ย", f"{df_info['Total import kW demand'].mean():.2f} kW")
+        st.metric("Demand สูงสุด", f"{df_info['Total import kW demand'].max():.2f} kW")
+    
+    st.markdown("---")
+    st.markdown("### 💡 คำแนะนำ")
+    st.info("💡 **เคล็ดลับ**: ใช้อัตรา TOU หากใช้ไฟใน Off-Peak มาก")
+    st.info("🔋 **EV Charging**: ควรชาร์จในช่วง 22:00-05:00 เพื่อประหยัด")
+
+# Section 1: File Upload
+st.markdown("""
+<div class="section-card">
+    <div class="section-header">
+        <span class="section-icon">📁</span>
+        <h2>อัปโหลดข้อมูลมิเตอร์</h2>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2 = st.columns([2, 3])
+with col1:
+    selected_file_type_label = st.radio(
+        "เลือกประเภทไฟล์ข้อมูล:",
+        ("📱 BLE-iMeter (.txt)", "🖥️ IPG (.txt)", "📊 มิเตอร์ PEA (CSV)"),
+        key="data_file_type_label"
+    )
 
 file_type_mapping = {
-    "BLE-iMeter (.txt)": "BLE-iMeter",
-    "IPG (.txt)": "IPG",
-    "มิเตอร์ PEA (CSV)": "มิเตอร์ PEA (CSV)"
+    "📱 BLE-iMeter (.txt)": "BLE-iMeter",
+    "🖥️ IPG (.txt)": "IPG", 
+    "📊 มิเตอร์ PEA (CSV)": "มิเตอร์ PEA (CSV)"
 }
 internal_file_type = file_type_mapping[selected_file_type_label]
 
-file_extension = 'csv' if internal_file_type == 'มิเตอร์ PEA (CSV)' else 'txt'
-if internal_file_type == 'มิเตอร์ PEA (CSV)':
-    st.info("💡 สำหรับไฟล์ Excel (.xlsx) กรุณาเปิดไฟล์แล้ว 'บันทึกเป็น' (Save As) ไฟล์ CSV ก่อนอัปโหลด")
+with col2:
+    file_extension = 'csv' if internal_file_type == 'มิเตอร์ PEA (CSV)' else 'txt'
+    if internal_file_type == 'มิเตอร์ PEA (CSV)':
+        st.markdown('<div class="status-badge status-info">💡 สำหรับไฟล์ Excel (.xlsx) กรุณาบันทึกเป็น CSV ก่อน</div>', unsafe_allow_html=True)
     
-uploaded_file = st.file_uploader(f"เลือกไฟล์ (.{file_extension})", type=[file_extension], key="file_uploader")
+    uploaded_file = st.file_uploader(
+        f"เลือกไฟล์ (.{file_extension})",
+        type=[file_extension],
+        key="file_uploader",
+        help=f"อัปโหลดไฟล์ {internal_file_type} ของคุณ"
+    )
 
 if uploaded_file and (uploaded_file.name != st.session_state.get('last_uploaded_filename') or internal_file_type != st.session_state.get('last_file_type')):
-    with st.spinner('กำลังประมวลผลไฟล์...'):
+    with st.spinner('🔄 กำลังประมวลผลไฟล์...'):
         try:
             st.session_state.full_dataframe = parse_data_file(uploaded_file, internal_file_type)
             st.session_state.last_uploaded_filename = uploaded_file.name
             st.session_state.last_file_type = internal_file_type
-            st.success(f"ประมวลผลไฟล์ '{uploaded_file.name}' สำเร็จ")
+            st.balloons()
+            st.success(f"✅ ประมวลผลไฟล์ '{uploaded_file.name}' สำเร็จ!")
         except ValueError as ve:
-            st.error(f"ข้อผิดพลาด: {ve}"); st.session_state.full_dataframe = None
+            st.error(f"❌ ข้อผิดพลาด: {ve}")
+            st.session_state.full_dataframe = None
 
 if st.session_state.get('full_dataframe') is not None:
-    st.divider(); st.header("2. ตั้งค่าการคำนวณ")
-    df_full = st.session_state.full_dataframe; min_date = df_full['DateTime'].min().date(); max_date = df_full['DateTime'].max().date()
+    # Section 2: Configuration
+    st.markdown("""
+    <div class="section-card">
+        <div class="section-header">
+            <span class="section-icon">⚙️</span>
+            <h2>ตั้งค่าการคำนวณ</h2>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    df_full = st.session_state.full_dataframe
+    min_date = df_full['DateTime'].min().date()
+    max_date = df_full['DateTime'].max().date()
     
     col1, col2 = st.columns([1, 2])
     with col1:
-        customer_label = st.selectbox("ประเภทผู้ใช้:", ["บ้านอยู่อาศัย", "กิจการขนาดเล็ก"], key="customer_type_label")
+        st.markdown("#### 👤 ประเภทผู้ใช้")
+        customer_label = st.selectbox(
+            "เลือกประเภท:",
+            ["🏠 บ้านอยู่อาศัย", "🏢 กิจการขนาดเล็ก"],
+            key="customer_type_label"
+        )
+        
         customer_key = "residential"
-        if customer_label == "กิจการขนาดเล็ก":
-            voltage_label = st.radio("ระดับแรงดันไฟฟ้า:", ("แรงดันต่ำกว่า 22 kV", "แรงดัน 22-33 kV"), key="voltage_level", horizontal=True)
-            customer_key = "smb_lv" if voltage_label == "แรงดันต่ำกว่า 22 kV" else "smb_mv"
-        tariff_type = st.selectbox("ประเภทอัตรา:", ["อัตราปกติ", "อัตรา TOU"], key="tariff_type")
+        if customer_label == "🏢 กิจการขนาดเล็ก":
+            voltage_label = st.radio(
+                "ระดับแรงดันไฟฟ้า:",
+                ("⚡ แรงดันต่ำกว่า 22 kV", "⚡⚡ แรงดัน 22-33 kV"),
+                key="voltage_level"
+            )
+            customer_key = "smb_lv" if voltage_label == "⚡ แรงดันต่ำกว่า 22 kV" else "smb_mv"
+        
+        st.markdown("#### 💰 ประเภทอัตรา")
+        tariff_type = st.selectbox(
+            "เลือกอัตรา:",
+            ["📊 อัตราปกติ", "⏰ อัตรา TOU"],
+            key="tariff_type"
+        )
         
     with col2:
-        main_date_range = st.date_input("เลือกช่วงวันที่สำหรับคำนวณ", value=(min_date, max_date), min_value=min_date, max_value=max_date, key="main_date_range")
+        st.markdown("#### 📅 ช่วงวันที่คำนวณ")
+        main_date_range = st.date_input(
+            "เลือกช่วงเวลา:",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+            key="main_date_range",
+            help="เลือกช่วงวันที่ที่ต้องการคำนวณค่าไฟ"
+        )
 
-    with st.expander("🔌 จำลอง EV Charger (ตัวเลือกเพิ่มเติม)"):
-        ev_enabled = st.checkbox("เปิดใช้งานการจำลอง EV", key="ev_enabled")
-        if len(main_date_range) == 2:
-            ev_start_range, ev_end_range = main_date_range
-            ev_date_range = st.date_input("เลือกช่วงวันที่สำหรับชาร์จ EV", value=(ev_start_range, ev_end_range), min_value=ev_start_range, max_value=ev_end_range, key="ev_date_range", disabled=not ev_enabled)
-        ev_col1, ev_col2, ev_col3 = st.columns(3)
-        ev_power_kw = ev_col1.number_input("กำลังไฟ Charger (kW):", min_value=0.1, value=7.0, step=0.1, key="ev_power", disabled=not ev_enabled)
-        ev_start_time = ev_col2.time_input("เวลาเริ่มชาร์จ", time(22, 0), key="ev_start_time", disabled=not ev_enabled)
-        ev_end_time = ev_col3.time_input("เวลาสิ้นสุดชาร์จ", time(5, 0), key="ev_end_time", disabled=not ev_enabled)
-    st.divider()
+    # EV Simulation Section
+    with st.expander("🚗 จำลอง EV Charger (Advanced)", expanded=False):
+        st.markdown("### ⚡ การตั้งค่า Electric Vehicle Charging")
+        
+        ev_enabled = st.checkbox("🔌 เปิดใช้งานการจำลอง EV Charger", key="ev_enabled")
+        
+        col_ev1, col_ev2 = st.columns(2)
+        with col_ev1:
+            if len(main_date_range) == 2:
+                ev_start_range, ev_end_range = main_date_range
+                ev_date_range = st.date_input(
+                    "📅 ช่วงวันที่ชาร์จ EV:",
+                    value=(ev_start_range, ev_end_range),
+                    min_value=ev_start_range,
+                    max_value=ev_end_range,
+                    key="ev_date_range",
+                    disabled=not ev_enabled
+                )
+            
+            ev_power_kw = st.number_input(
+                "⚡ กำลังไฟ Charger (kW):",
+                min_value=0.1,
+                value=7.0,
+                step=0.1,
+                key="ev_power",
+                disabled=not ev_enabled,
+                help="กำลังไฟของเครื่องชาร์จ EV"
+            )
+        
+        with col_ev2:
+            ev_start_time = st.time_input(
+                "🌙 เวลาเริ่มชาร์จ:",
+                time(22, 0),
+                key="ev_start_time",
+                disabled=not ev_enabled,
+                help="เวลาที่เริ่มชาร์จ EV"
+            )
+            
+            ev_end_time = st.time_input(
+                "🌅 เวลาสิ้นสุดชาร์จ:",
+                time(5, 0),
+                key="ev_end_time",
+                disabled=not ev_enabled,
+                help="เวลาที่สิ้นสุดการชาร์จ EV"
+            )
+        
+        if ev_enabled:
+            # Show EV preview
+            st.markdown("### 📋 สรุปการตั้งค่า EV")
+            ev_hours = (datetime.combine(date.today(), ev_end_time) - datetime.combine(date.today(), ev_start_time)).total_seconds() / 3600
+            if ev_hours < 0:
+                ev_hours += 24  # Handle overnight charging
+            
+            col_preview1, col_preview2, col_preview3 = st.columns(3)
+            col_preview1.metric("🔋 กำลังชาร์จ", f"{ev_power_kw} kW")
+            col_preview2.metric("⏱️ ชั่วโมงต่อวัน", f"{ev_hours:.1f} ชม.")
+            col_preview3.metric("📊 พลังงานต่อวัน", f"{ev_power_kw * ev_hours:.1f} kWh")
 
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    # Calculation Buttons
     col_calc1, col_calc2 = st.columns(2)
     with col_calc1:
-        if st.button("คำนวณค่าไฟ", type="primary"):
+        calc_button = st.button("🧮 คำนวณค่าไฟ", type="primary", use_container_width=True)
+        if calc_button:
             st.session_state.do_calculation = True
+    
     with col_calc2:
-        if st.button("🔄 เปรียบเทียบอัตราปกติ vs TOU", type="secondary"):
+        compare_button = st.button("🔄 เปรียบเทียบอัตราปกติ vs TOU", type="secondary", use_container_width=True)
+        if compare_button:
             st.session_state.do_comparison = True
 
+    # Calculation Logic
     if st.session_state.get('do_calculation', False):
-        st.session_state.calculation_result = None; st.session_state.ev_cost = None; st.session_state.base_kwh = None; st.session_state.ev_kwh = None
-        if len(main_date_range) != 2: st.error("กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
+        st.session_state.calculation_result = None
+        st.session_state.ev_cost = None
+        st.session_state.base_kwh = None
+        st.session_state.ev_kwh = None
+        
+        if len(main_date_range) != 2:
+            st.error("❌ กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
         else:
             main_start_date, main_end_date = main_date_range
-            with st.spinner("กำลังคำนวณ..."):
+            with st.spinner("🔄 กำลังคำนวณ..."):
                 try:
                     mask = (df_full['DateTime'].dt.date >= main_start_date) & (df_full['DateTime'].dt.date <= main_end_date)
                     df_filtered = df_full[mask].copy()
-                    if df_filtered.empty: st.warning("ไม่พบข้อมูลในช่วงวันที่ที่เลือก")
+                    if df_filtered.empty:
+                        st.warning("⚠️ ไม่พบข้อมูลในช่วงวันที่ที่เลือก")
                     else:
-                        tariff_key_str = "tou" if tariff_type == "อัตรา TOU" else "normal"
+                        tariff_key_str = "tou" if tariff_type == "⏰ อัตรา TOU" else "normal"
                         interval_hours = (df_filtered['DateTime'].iloc[1] - df_filtered['DateTime'].iloc[0]).total_seconds() / 3600.0 if len(df_filtered) > 1 else 0.25
                         if not (0 < interval_hours <= 24): interval_hours = 0.25
                         
-                        df_base = df_filtered.copy(); df_base['kWh'] = df_base['Total import kW demand'] * interval_hours
+                        df_base = df_filtered.copy()
+                        df_base['kWh'] = df_base['Total import kW demand'] * interval_hours
                         base_bill_details = calculate_bill(df_base, customer_key, tariff_key_str)
                         st.session_state.base_kwh = base_bill_details['total_kwh']
                         
@@ -298,7 +713,8 @@ if st.session_state.get('full_dataframe') is not None:
                         
                         if ev_enabled:
                             df_with_ev = df_filtered.copy()
-                            time_series = df_with_ev['DateTime'].dt.time; date_series = df_with_ev['DateTime'].dt.date
+                            time_series = df_with_ev['DateTime'].dt.time
+                            date_series = df_with_ev['DateTime'].dt.date
                             ev_start_date_select, ev_end_date_select = st.session_state.ev_date_range
                             time_mask = (time_series >= ev_start_time) | (time_series < ev_end_time) if ev_start_time > ev_end_time else (time_series >= ev_start_time) & (time_series < ev_end_time)
                             date_mask = (date_series >= ev_start_date_select) & (date_series <= ev_end_date_select)
@@ -310,73 +726,107 @@ if st.session_state.get('full_dataframe') is not None:
                             st.session_state.ev_cost = total_bill_details['final_bill'] - base_bill_details['final_bill']
                             st.session_state.ev_kwh = total_bill_details['total_kwh'] - base_bill_details['total_kwh']
                             st.session_state.df_for_plotting = df_with_ev
-                        else: st.session_state.df_for_plotting = df_base
+                        else:
+                            st.session_state.df_for_plotting = df_base
+                        
                         st.session_state.calculation_result = total_bill_details
                         st.session_state.do_calculation = False
-                except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}"); st.error(traceback.format_exc())
+                        st.success("✅ คำนวณเสร็จสิ้น!")
+                        
+                except Exception as e:
+                    st.error(f"❌ เกิดข้อผิดพลาด: {e}")
+                    st.error(traceback.format_exc())
 
+    # Comparison Logic
     if st.session_state.get('do_comparison', False):
-        st.session_state.calculation_result = None; st.session_state.ev_cost = None; st.session_state.base_kwh = None; st.session_state.ev_kwh = None
-        if len(main_date_range) != 2: st.error("กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
+        st.session_state.calculation_result = None
+        st.session_state.ev_cost = None
+        st.session_state.base_kwh = None
+        st.session_state.ev_kwh = None
+        
+        if len(main_date_range) != 2:
+            st.error("❌ กรุณาเลือกวันเริ่มต้นและวันสิ้นสุด")
         else:
             main_start_date, main_end_date = main_date_range
-            with st.spinner("กำลังเปรียบเทียบอัตราค่าไฟ..."):
+            with st.spinner("🔄 กำลังเปรียบเทียบอัตราค่าไฟ..."):
                 try:
                     mask = (df_full['DateTime'].dt.date >= main_start_date) & (df_full['DateTime'].dt.date <= main_end_date)
                     df_filtered = df_full[mask].copy()
-                    if df_filtered.empty: st.warning("ไม่พบข้อมูลในช่วงวันที่ที่เลือก")
+                    if df_filtered.empty:
+                        st.warning("⚠️ ไม่พบข้อมูลในช่วงวันที่ที่เลือก")
                     else:
                         interval_hours = (df_filtered['DateTime'].iloc[1] - df_filtered['DateTime'].iloc[0]).total_seconds() / 3600.0 if len(df_filtered) > 1 else 0.25
                         if not (0 < interval_hours <= 24): interval_hours = 0.25
                         
-                        # เตรียมข้อมูลพื้นฐาน
-                        df_base = df_filtered.copy(); df_base['kWh'] = df_base['Total import kW demand'] * interval_hours
+                        df_base = df_filtered.copy()
+                        df_base['kWh'] = df_base['Total import kW demand'] * interval_hours
                         
-                        # เพิ่ม EV หากเปิดใช้งาน
                         if ev_enabled:
-                            time_series = df_base['DateTime'].dt.time; date_series = df_base['DateTime'].dt.date
+                            time_series = df_base['DateTime'].dt.time
+                            date_series = df_base['DateTime'].dt.date
                             ev_start_date_select, ev_end_date_select = st.session_state.ev_date_range
                             time_mask = (time_series >= ev_start_time) | (time_series < ev_end_time) if ev_start_time > ev_end_time else (time_series >= ev_start_time) & (time_series < ev_end_time)
                             date_mask = (date_series >= ev_start_date_select) & (date_series <= ev_end_date_select)
                             df_base.loc[time_mask & date_mask, 'Total import kW demand'] += ev_power_kw
                             df_base['kWh'] = df_base['Total import kW demand'] * interval_hours
                         
-                        # คำนวณทั้งสองอัตรา
                         normal_bill = calculate_bill(df_base, customer_key, "normal")
                         tou_bill = calculate_bill(df_base, customer_key, "tou")
                         
-                        # แสดงผลเปรียบเทียบ
-                        st.divider()
-                        st.header("🔄 เปรียบเทียบอัตราค่าไฟ")
+                        # Display Comparison Results
+                        st.markdown("""
+                        <div class="section-card">
+                            <div class="section-header">
+                                <span class="section-icon">🔄</span>
+                                <h2>เปรียบเทียบอัตราค่าไฟ</h2>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
                         
                         comp_col1, comp_col2, comp_col3 = st.columns(3)
+                        
                         with comp_col1:
-                            st.subheader("📊 อัตราปกติ")
-                            st.metric("ยอดค่าไฟสุทธิ", f"{normal_bill['final_bill']:,.2f} บาท")
-                            st.metric("หน่วยไฟรวม", f"{normal_bill['total_kwh']:,.2f} kWh")
+                            st.markdown("""
+                            <div class="comparison-card comparison-normal">
+                                <h3>📊 อัตราปกติ</h3>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            st.metric("💰 ยอดค่าไฟสุทธิ", f"{normal_bill['final_bill']:,.2f} บาท")
+                            st.metric("⚡ หน่วยไฟรวม", f"{normal_bill['total_kwh']:,.2f} kWh")
                         
                         with comp_col2:
-                            st.subheader("⏰ อัตรา TOU")
-                            st.metric("ยอดค่าไฟสุทธิ", f"{tou_bill['final_bill']:,.2f} บาท")
-                            st.metric("หน่วยไฟรวม", f"{tou_bill['total_kwh']:,.2f} kWh")
-                            st.metric("Peak", f"{tou_bill['kwh_peak']:,.2f} kWh")
-                            st.metric("Off-Peak", f"{tou_bill['kwh_off_peak']:,.2f} kWh")
+                            st.markdown("""
+                            <div class="comparison-card comparison-tou">
+                                <h3>⏰ อัตรา TOU</h3>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            st.metric("💰 ยอดค่าไฟสุทธิ", f"{tou_bill['final_bill']:,.2f} บาท")
+                            st.metric("⚡ หน่วยไฟรวม", f"{tou_bill['total_kwh']:,.2f} kWh")
+                            st.metric("🌅 Peak", f"{tou_bill['kwh_peak']:,.2f} kWh")
+                            st.metric("🌙 Off-Peak", f"{tou_bill['kwh_off_peak']:,.2f} kWh")
                         
                         with comp_col3:
                             difference = tou_bill['final_bill'] - normal_bill['final_bill']
                             percentage = (difference / normal_bill['final_bill']) * 100 if normal_bill['final_bill'] > 0 else 0
-                            st.subheader("💡 ผลต่าง")
+                            
+                            card_class = "comparison-diff" if difference <= 0 else "comparison-diff negative"
+                            st.markdown(f"""
+                            <div class="comparison-card {card_class}">
+                                <h3>💡 ผลต่าง</h3>
+                            </div>
+                            """, unsafe_allow_html=True)
+                            
                             if difference < 0:
-                                st.success(f"TOU ประหยัดกว่า\n{abs(difference):,.2f} บาท")
-                                st.success(f"ประหยัด {abs(percentage):.1f}%")
+                                st.success(f"✅ TOU ประหยัดกว่า\n{abs(difference):,.2f} บาท")
+                                st.success(f"📉 ประหยัด {abs(percentage):.1f}%")
                             elif difference > 0:
-                                st.error(f"TOU แพงกว่า\n{difference:,.2f} บาท")
-                                st.error(f"แพงขึ้น {percentage:.1f}%")
+                                st.error(f"❌ TOU แพงกว่า\n{difference:,.2f} บาท")
+                                st.error(f"📈 แพงขึ้น {percentage:.1f}%")
                             else:
-                                st.info("ค่าไฟเท่ากัน")
+                                st.info("⚖️ ค่าไฟเท่ากัน")
                         
-                        # ตารางเปรียบเทียบรายละเอียด
-                        with st.expander("📋 ดูรายละเอียดการเปรียบเทียบ"):
+                        # Detailed Comparison Table
+                        with st.expander("📋 รายละเอียดการเปรียบเทียบ", expanded=True):
                             comparison_data = {
                                 "รายการ": [
                                     "ค่าพลังงานไฟฟ้า (บาท)",
@@ -386,7 +836,7 @@ if st.session_state.get('full_dataframe') is not None:
                                     "VAT 7% (บาท)",
                                     "ยอดสุทธิ (บาท)"
                                 ],
-                                "อัตราปกติ": [
+                                "📊 อัตราปกติ": [
                                     f"{normal_bill['base_energy_cost']:,.2f}",
                                     f"{normal_bill['service_charge']:,.2f}",
                                     f"{normal_bill['ft_cost']:,.2f}",
@@ -394,7 +844,7 @@ if st.session_state.get('full_dataframe') is not None:
                                     f"{normal_bill['vat_amount']:,.2f}",
                                     f"{normal_bill['final_bill']:,.2f}"
                                 ],
-                                "อัตรา TOU": [
+                                "⏰ อัตรา TOU": [
                                     f"{tou_bill['base_energy_cost']:,.2f}",
                                     f"{tou_bill['service_charge']:,.2f}",
                                     f"{tou_bill['ft_cost']:,.2f}",
@@ -402,7 +852,7 @@ if st.session_state.get('full_dataframe') is not None:
                                     f"{tou_bill['vat_amount']:,.2f}",
                                     f"{tou_bill['final_bill']:,.2f}"
                                 ],
-                                "ผลต่าง": [
+                                "💡 ผลต่าง": [
                                     f"{tou_bill['base_energy_cost'] - normal_bill['base_energy_cost']:+,.2f}",
                                     f"{tou_bill['service_charge'] - normal_bill['service_charge']:+,.2f}",
                                     f"{tou_bill['ft_cost'] - normal_bill['ft_cost']:+,.2f}",
@@ -414,8 +864,8 @@ if st.session_state.get('full_dataframe') is not None:
                             comparison_df = pd.DataFrame(comparison_data)
                             st.dataframe(comparison_df, use_container_width=True, hide_index=True)
                             
-                            # คำแนะนำ
-                            st.subheader("💡 คำแนะนำ")
+                            # Recommendations
+                            st.markdown("### 💡 คำแนะนำ")
                             if difference < -50:
                                 st.success("🎯 **แนะนำให้เปลี่ยนเป็นอัตรา TOU** - ประหยัดค่าไฟได้มาก เนื่องจากใช้ไฟใน Off-Peak มากกว่า Peak")
                             elif difference < 0:
@@ -426,57 +876,301 @@ if st.session_state.get('full_dataframe') is not None:
                                 st.error("❌ **อัตราปกติประหยัดกว่า** - ไม่แนะนำให้เปลี่ยนเป็น TOU เนื่องจากใช้ไฟใน Peak มาก")
                         
                         st.session_state.do_comparison = False
-                except Exception as e: st.error(f"เกิดข้อผิดพลาด: {e}"); st.error(traceback.format_exc())
+                        
+                except Exception as e:
+                    st.error(f"❌ เกิดข้อผิดพลาด: {e}")
+                    st.error(traceback.format_exc())
 
+# Results Display
 if st.session_state.calculation_result:
-    st.divider(); st.header("3. ผลการคำนวณ")
-    bill = st.session_state.calculation_result; ev_cost = st.session_state.ev_cost; base_kwh = st.session_state.base_kwh; ev_kwh = st.session_state.ev_kwh
-    if bill.get("error"): st.error(f"เกิดข้อผิดพลาด: {bill['error']}")
+    st.markdown("""
+    <div class="section-card">
+        <div class="section-header">
+            <span class="section-icon">📊</span>
+            <h2>ผลการคำนวณ</h2>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    bill = st.session_state.calculation_result
+    ev_cost = st.session_state.ev_cost
+    base_kwh = st.session_state.base_kwh
+    ev_kwh = st.session_state.ev_kwh
+    
+    if bill.get("error"):
+        st.error(f"❌ เกิดข้อผิดพลาด: {bill['error']}")
     else:
         is_ev_calculated = st.session_state.get('ev_enabled') and ev_cost is not None
+        
+        # Main Metrics
         if is_ev_calculated:
             m_col1, m_col2, m_col3, m_col4 = st.columns(4)
-            m_col1.metric("💰 ยอดค่าไฟรวม", f"{bill['final_bill']:,.2f} บาท")
-            m_col2.metric("🚗 ค่าไฟส่วน EV", f"{ev_cost:,.2f} บาท")
-            m_col3.metric("🏠 หน่วยไฟบ้าน", f"{base_kwh:,.2f} kWh")
-            m_col4.metric("🚗 หน่วยไฟ EV", f"{ev_kwh:,.2f} kWh")
+            with m_col1:
+                st.markdown("""
+                <div class="metric-card">
+                    <div class="metric-value">💰 {:.2f}</div>
+                    <div class="metric-label">ยอดค่าไฟรวม (บาท)</div>
+                </div>
+                """.format(bill['final_bill']), unsafe_allow_html=True)
+            
+            with m_col2:
+                st.markdown("""
+                <div class="metric-card">
+                    <div class="metric-value">🚗 {:.2f}</div>
+                    <div class="metric-label">ค่าไฟส่วน EV (บาท)</div>
+                </div>
+                """.format(ev_cost), unsafe_allow_html=True)
+            
+            with m_col3:
+                st.markdown("""
+                <div class="metric-card">
+                    <div class="metric-value">🏠 {:.2f}</div>
+                    <div class="metric-label">หน่วยไฟบ้าน (kWh)</div>
+                </div>
+                """.format(base_kwh), unsafe_allow_html=True)
+            
+            with m_col4:
+                st.markdown("""
+                <div class="metric-card">
+                    <div class="metric-value">🔋 {:.2f}</div>
+                    <div class="metric-label">หน่วยไฟ EV (kWh)</div>
+                </div>
+                """.format(ev_kwh), unsafe_allow_html=True)
         else:
             m_col1, m_col2, m_col3 = st.columns(3)
-            m_col1.metric("💰 ยอดค่าไฟฟ้าสุทธิ", f"{bill['final_bill']:,.2f} บาท")
-            m_col2.metric("⚡️ ยอดใช้ไฟรวม", f"{bill['total_kwh']:,.2f} kWh")
-            m_col3.metric("🔥 อัตรา Ft ที่ใช้", f"{bill['applicable_ft_rate']:.4f}")
+            with m_col1:
+                st.markdown("""
+                <div class="metric-card">
+                    <div class="metric-value">💰 {:.2f}</div>
+                    <div class="metric-label">ยอดค่าไฟฟ้าสุทธิ (บาท)</div>
+                </div>
+                """.format(bill['final_bill']), unsafe_allow_html=True)
+            
+            with m_col2:
+                st.markdown("""
+                <div class="metric-card">
+                    <div class="metric-value">⚡ {:.2f}</div>
+                    <div class="metric-label">ยอดใช้ไฟรวม (kWh)</div>
+                </div>
+                """.format(bill['total_kwh']), unsafe_allow_html=True)
+            
+            with m_col3:
+                st.markdown("""
+                <div class="metric-card">
+                    <div class="metric-value">🔥 {:.4f}</div>
+                    <div class="metric-label">อัตรา Ft ที่ใช้</div>
+                </div>
+                """.format(bill['applicable_ft_rate']), unsafe_allow_html=True)
 
-        with st.expander("📄 ดูรายละเอียดการคำนวณและดาวน์โหลด"):
+        # Detailed Results
+        with st.expander("📄 รายละเอียดการคำนวณและดาวน์โหลด", expanded=False):
             display_customer_label = st.session_state.customer_type_label
-            if st.session_state.customer_type_label == "กิจการขนาดเล็ก":
+            if st.session_state.customer_type_label == "🏢 กิจการขนาดเล็ก":
                 display_customer_label += f" ({st.session_state.voltage_level})"
+            
             output = [
-                "--- ผลการคำนวณค่าไฟฟ้า ---",
+                "=== ผลการคำนวณค่าไฟฟ้า ===",
                 f"ช่วงข้อมูล: {bill['data_period_start']} ถึง {bill['data_period_end']}",
-                f"ประเภทผู้ใช้: {display_customer_label}, อัตรา: {st.session_state.tariff_type}",]
+                f"ประเภทผู้ใช้: {display_customer_label}, อัตรา: {st.session_state.tariff_type}",
+            ]
+            
             if is_ev_calculated:
                 ev_start_date_str = st.session_state.ev_date_range[0].strftime('%d/%m/%Y')
                 ev_end_date_str = st.session_state.ev_date_range[1].strftime('%d/%m/%Y')
                 output.append(f"จำลอง EV: {st.session_state.ev_power:.2f} kW ({st.session_state.ev_start_time.strftime('%H:%M')} - {st.session_state.ev_end_time.strftime('%H:%M')})")
                 output.append(f"          (ช่วงวันที่ชาร์จ: {ev_start_date_str} - {ev_end_date_str})")
             
-            output.extend(["-"*40, f"ยอดใช้ไฟรวม: {bill['total_kwh']:,.2f} kWh"])
+            output.extend(["-"*50, f"ยอดใช้ไฟรวม: {bill['total_kwh']:,.2f} kWh"])
+            
             if is_ev_calculated: 
                 output.extend([f"  - หน่วยไฟบ้าน: {base_kwh:,.2f} kWh", f"  - หน่วยไฟ EV: {ev_kwh:,.2f} kWh"])
-            if st.session_state.tariff_type == 'อัตรา TOU': 
+            
+            if st.session_state.tariff_type == '⏰ อัตรา TOU': 
                 output.extend([f"  - Peak: {bill['kwh_peak']:,.2f} kWh", f"  - Off-Peak: {bill['kwh_off_peak']:,.2f} kWh"])
-            output.extend(["-"*40, f"{'ค่าพลังงานไฟฟ้า':<25}: {bill['base_energy_cost']:>12,.2f} บาท", f"{'ค่าบริการรายเดือน':<25}: {bill['service_charge']:>12,.2f} บาท", f"{f'ค่า Ft (@{bill['applicable_ft_rate']:.4f})':<25}: {bill['ft_cost']:>12,.2f} บาท", "-"*40, f"{'ยอดรวมก่อน VAT':<25}: {bill['total_before_vat']:>12,.2f} บาท", f"{f'ภาษีมูลค่าเพิ่ม ({VAT_RATE*100:.0f}%)':<25}: {bill['vat_amount']:>12,.2f} บาท", "="*40])
+            
+            output.extend([
+                "-"*50,
+                f"{'ค่าพลังงานไฟฟ้า':<30}: {bill['base_energy_cost']:>15,.2f} บาท",
+                f"{'ค่าบริการรายเดือน':<30}: {bill['service_charge']:>15,.2f} บาท",
+                f"{f'ค่า Ft (@{bill['applicable_ft_rate']:.4f})':<30}: {bill['ft_cost']:>15,.2f} บาท",
+                "-"*50,
+                f"{'ยอดรวมก่อน VAT':<30}: {bill['total_before_vat']:>15,.2f} บาท",
+                f"{f'ภาษีมูลค่าเพิ่ม ({VAT_RATE*100:.0f}%)':<30}: {bill['vat_amount']:>15,.2f} บาท",
+                "="*50
+            ])
+            
             if is_ev_calculated: 
-                output.extend([f"{'ค่าไฟบ้าน (ไม่รวม EV)':<25}: {bill['final_bill'] - ev_cost:>12,.2f} บาท", f"{'ค่าไฟส่วน EV':<25}: {ev_cost:>12,.2f} บาท", "="*40])
-            output.append(f"{'**ยอดค่าไฟฟ้าสุทธิ**':<25}: {bill['final_bill']:>12,.2f} บาท")
+                output.extend([
+                    f"{'ค่าไฟบ้าน (ไม่รวม EV)':<30}: {bill['final_bill'] - ev_cost:>15,.2f} บาท",
+                    f"{'ค่าไฟส่วน EV':<30}: {ev_cost:>15,.2f} บาท",
+                    "="*50
+                ])
+            
+            output.append(f"{'**ยอดค่าไฟฟ้าสุทธิ**':<30}: {bill['final_bill']:>15,.2f} บาท")
+            
             details_text = "\n".join(output)
             st.code(details_text, language=None)
-            st.download_button("📥 ดาวน์โหลดผลลัพธ์ (.txt)", details_text.encode('utf-8'), f"bill_result_{datetime.now().strftime('%Y%m%d_%H%M')}.txt", 'text/plain')
+            st.download_button(
+                "📥 ดาวน์โหลดผลลัพธ์ (.txt)",
+                details_text.encode('utf-8'),
+                f"bill_result_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
+                'text/plain'
+            )
         
-        st.subheader("กราฟ Load Profile (kW Demand)")
-        df_plot = st.session_state.get('df_for_plotting');
+        # Enhanced Chart Section
+        st.markdown("""
+        <div class="section-card">
+            <div class="section-header">
+                <span class="section-icon">📈</span>
+                <h2>กราฟวิเคราะห์การใช้ไฟ</h2>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        df_plot = st.session_state.get('df_for_plotting')
         if df_plot is not None and not df_plot.empty:
-            st.line_chart(df_plot.set_index('DateTime')['Total import kW demand'])
-            st.caption("กราฟแสดงการใช้พลังงาน (kW) สำหรับช่วงวันที่ที่เลือก (รวมผลจากการจำลอง EV หากเปิดใช้งาน)")
-        else: 
-            st.warning("ไม่มีข้อมูลสำหรับสร้างกราฟ")
+            # Create enhanced chart
+            chart_fig = create_enhanced_chart(df_plot)
+            if chart_fig:
+                st.plotly_chart(chart_fig, use_container_width=True)
+            
+            # Additional analysis charts
+            col_chart1, col_chart2 = st.columns(2)
+            
+            with col_chart1:
+                # Daily consumption chart
+                daily_consumption = df_plot.groupby(df_plot['DateTime'].dt.date)['Total import kW demand'].mean().reset_index()
+                daily_consumption.columns = ['Date', 'Average_kW']
+                
+                fig_daily = px.bar(
+                    daily_consumption,
+                    x='Date',
+                    y='Average_kW',
+                    title="📊 การใช้ไฟเฉลี่ยรายวัน",
+                    color='Average_kW',
+                    color_continuous_scale='blues'
+                )
+                fig_daily.update_layout(
+                    title_font=dict(size=16, color='#2c3e50'),
+                    height=300,
+                    margin=dict(l=10, r=10, t=40, b=10)
+                )
+                st.plotly_chart(fig_daily, use_container_width=True)
+            
+            with col_chart2:
+                # Hourly pattern chart
+                df_plot['Hour'] = df_plot['DateTime'].dt.hour
+                hourly_pattern = df_plot.groupby('Hour')['Total import kW demand'].mean().reset_index()
+                
+                fig_hourly = px.line(
+                    hourly_pattern,
+                    x='Hour',
+                    y='Total import kW demand',
+                    title="⏰ รูปแบบการใช้ไฟตามชั่วโมง",
+                    markers=True
+                )
+                fig_hourly.update_traces(line_color='#667eea', line_width=3)
+                fig_hourly.update_layout(
+                    title_font=dict(size=16, color='#2c3e50'),
+                    height=300,
+                    margin=dict(l=10, r=10, t=40, b=10)
+                )
+                st.plotly_chart(fig_hourly, use_container_width=True)
+            
+            # TOU Analysis (if applicable)
+            if st.session_state.tariff_type == '⏰ อัตรา TOU':
+                st.markdown("### ⏰ วิเคราะห์ Peak/Off-Peak")
+                
+                # Add TOU classification
+                df_plot['TOU_Period'] = df_plot['DateTime'].apply(classify_tou_period)
+                tou_summary = df_plot.groupby('TOU_Period')['Total import kW demand'].agg(['mean', 'sum', 'count']).reset_index()
+                
+                col_tou1, col_tou2 = st.columns(2)
+                
+                with col_tou1:
+                    fig_tou_pie = px.pie(
+                        tou_summary,
+                        values='sum',
+                        names='TOU_Period',
+                        title="🥧 สัดส่วนการใช้ไฟ Peak vs Off-Peak",
+                        color_discrete_map={'Peak': '#ff6b6b', 'Off-Peak': '#4ecdc4'}
+                    )
+                    fig_tou_pie.update_layout(height=300)
+                    st.plotly_chart(fig_tou_pie, use_container_width=True)
+                
+                with col_tou2:
+                    fig_tou_bar = px.bar(
+                        tou_summary,
+                        x='TOU_Period',
+                        y='mean',
+                        title="📊 ค่าเฉลี่ย Peak vs Off-Peak",
+                        color='TOU_Period',
+                        color_discrete_map={'Peak': '#ff6b6b', 'Off-Peak': '#4ecdc4'}
+                    )
+                    fig_tou_bar.update_layout(height=300, showlegend=False)
+                    st.plotly_chart(fig_tou_bar, use_container_width=True)
+            
+            # Summary Statistics
+            with st.expander("📊 สถิติการใช้ไฟ", expanded=False):
+                stats_col1, stats_col2, stats_col3, stats_col4 = st.columns(4)
+                
+                with stats_col1:
+                    st.metric("📈 ค่าสูงสุด", f"{df_plot['Total import kW demand'].max():.2f} kW")
+                    st.metric("📉 ค่าต่ำสุด", f"{df_plot['Total import kW demand'].min():.2f} kW")
+                
+                with stats_col2:
+                    st.metric("📊 ค่าเฉลี่ย", f"{df_plot['Total import kW demand'].mean():.2f} kW")
+                    st.metric("📐 ค่ามัธยฐาน", f"{df_plot['Total import kW demand'].median():.2f} kW")
+                
+                with stats_col3:
+                    st.metric("📏 ส่วนเบียงเบนมาตรฐาน", f"{df_plot['Total import kW demand'].std():.2f} kW")
+                    st.metric("🎯 Load Factor", f"{(df_plot['Total import kW demand'].mean() / df_plot['Total import kW demand'].max() * 100):.1f}%")
+                
+                with stats_col4:
+                    peak_hours = len(df_plot[df_plot['Total import kW demand'] > df_plot['Total import kW demand'].quantile(0.9)])
+                    st.metric("⚡ จำนวนข้อมูล", f"{len(df_plot):,} รายการ")
+                    st.metric("🔥 ช่วง Peak (>90%)", f"{peak_hours:,} รายการ")
+        else:
+            st.warning("⚠️ ไม่มีข้อมูลสำหรับสร้างกราฟ")
+        
+        # Energy Efficiency Tips
+        st.markdown("""
+        <div class="section-card">
+            <div class="section-header">
+                <span class="section-icon">💡</span>
+                <h2>คำแนะนำประหยัดพลังงาน</h2>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        tips_col1, tips_col2 = st.columns(2)
+        
+        with tips_col1:
+            st.markdown("""
+            ### 🏠 สำหรับบ้านอยู่อาศัย
+            - 🌡️ **เครื่องปรับอากาศ**: ตั้งที่ 25-26°C ประหยัดได้ 6-8%
+            - 💡 **หลัดไฟ LED**: ประหยัดได้ถึง 80% เมื่อเทียบกับหลอดไส้
+            - 🔌 **ถอดปลั๊ก**: เครื่องใช้ไฟฟ้าที่ไม่ได้ใช้งาน
+            - ⏰ **ใช้ไฟในช่วง Off-Peak**: 22:00-09:00 น.
+            """)
+        
+        with tips_col2:
+            st.markdown("""
+            ### 🚗 สำหรับ EV Charging
+            - 🌙 **ชาร์จกลางคืน**: ช่วง 22:00-05:00 ประหยัดสุด
+            - 📱 **Smart Charging**: ใช้ระบบจัดการการชาร์จอัตโนมัติ
+            - 🔋 **Battery Management**: ชาร์จ 20-80% เพื่อยืดอายุแบตเตอรี่
+            - ☀️ **Solar + EV**: พิจารณาติดตั้งโซลาร์เซลล์
+            """)
+
+# Footer
+st.markdown("""
+<div style="margin-top: 3rem; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 15px; text-align: center;">
+    <p style="color: white; margin: 0; font-size: 1.1rem; font-weight: 500;">
+        ⚡ Electric Bill Calculator Pro | Made with ❤️ using Streamlit
+    </p>
+    <p style="color: rgba(255,255,255,0.8); margin: 0.5rem 0 0 0; font-size: 0.9rem;">
+        เครื่องมือคำนวณค่าไฟฟ้าระดับมืออาชีพสำหรับทุกคน
+    </p>
+</div>
+""", unsafe_allow_html=True)
