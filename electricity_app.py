@@ -1414,6 +1414,55 @@ if st.session_state.calculation_result:
                 f"bill_result_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
                 'text/plain'
             )
+            
+            # เพิ่มปุ่มพิมพ์รายงาน
+            if st.button("🖨️ สร้างรายงานสำหรับพิมพ์", type="secondary", use_container_width=True):
+                # เตรียมข้อมูลสำหรับรายงาน
+                settings_data = {
+                    'customer_type': display_customer_label,
+                    'tariff_type': st.session_state.tariff_type
+                }
+                
+                ev_report_data = {
+                    'is_enabled': is_ev_calculated,
+                    'cost': ev_cost if ev_cost else 0,
+                    'kwh': ev_kwh if ev_kwh else 0
+                }
+                
+                # สร้างรายงาน HTML
+                report_html = generate_print_report(
+                    bill_data=bill,
+                    ev_data=ev_report_data,
+                    df_plot=st.session_state.get('df_for_plotting'),
+                    settings=settings_data
+                )
+                
+                # แสดงรายงานในหน้าต่างใหม่
+                st.components.v1.html(
+                    f"""
+                    <script>
+                    function openPrintReport() {{
+                        var printWindow = window.open('', '_blank');
+                        printWindow.document.write(`{report_html}`);
+                        printWindow.document.close();
+                        printWindow.focus();
+                        
+                        // Auto print after loading
+                        printWindow.onload = function() {{
+                            setTimeout(function() {{
+                                printWindow.print();
+                            }}, 500);
+                        }};
+                    }}
+                    openPrintReport();
+                    </script>
+                    <div style="padding: 20px; background: #e8f5e8; border-radius: 10px; text-align: center; margin: 10px 0;">
+                        <h3 style="color: #2e7d32; margin: 0;">✅ รายงานพร้อมพิมพ์!</h3>
+                        <p style="color: #2e7d32; margin: 5px 0;">หน้าต่างใหม่จะเปิดขึ้นพร้อมรายงานที่พร้อมพิมพ์</p>
+                    </div>
+                    """,
+                    height=150
+                )
         
         # Enhanced Chart Section
         st.markdown("""
